@@ -45,6 +45,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     agentFeedback: true,
+    agentUpgrade: "security",
     serverActions: {
       allowedOrigins: remoteDevelopmentHosts,
     },
