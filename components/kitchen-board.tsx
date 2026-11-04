@@ -1,0 +1,100 @@
+"use client";
+
+import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, BellRing, BellRingIcon, Check, ChefHat, LoaderCircle, Printer, Radio, RefreshCw, Volume2, VolumeX, Wifi, WifiOff, X } from "lucide-react";
+import { toast } from "sonner";
+import { acceptOrderAction, acknowledgeCancellationAction, rejectOrderAction, savePushSubscriptionAction } from "@/app/orders/actions";
+import { createClient } from "@/lib/supabase/client";
+import type { Order } from "@/lib/domain";
+import { formatDateTime } from "@/lib/dates";
+import { formatQuantity } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/status-badge";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+}
+
+export function KitchenBoard({ initialOrders }: { initialOrders: Order[] }) {
+  const router = useRouter();
+  const orders = initialOrders;
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [pushStatus, setPushStatus] = useState<"idle" | "enabled" | "unsupported" | "denied">("idle");
+  const [realtime, setRealtime] = useState<"connecting" | "connected" | "error">(() => createClient() ? "connecting" : "error");
+  const [dismissedAttention, setDismissedAttention] = useState<string | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update); window.addEventListener("offline", update);
+    const supabase = createClient();
+    if (!supabase) return () => undefined;
+    const channel = supabase.channel("kitchen-orders").on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => router.refresh()).subscribe((status: string) => setRealtime(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "error" : "connecting"));
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); void supabase.removeChannel(channel); };
+  }, [router]);
+
+  const pendingOrders = orders.filter((order) => order.status === "pending");
+  const cancellations = orders.filter((order) => order.status === "cancelled" && order.cancellation_requires_ack && !order.cancellation_acknowledged_at);
+  const needsAttention = pendingOrders.length + cancellations.length;
+  const attentionKey = [...cancellations.map((order) => `${order.id}:cancelled`), ...pendingOrders.map((order) => `${order.id}:${order.current_version}`)].sort().join("|");
+
+  function beep() {
+    const context = audioContext.current; if (!context) return;
+    const oscillator = context.createOscillator(); const gain = context.createGain();
+    oscillator.type = cancellations.length ? "square" : "sine"; oscillator.frequency.value = cancellations.length ? 520 : 740;
+    gain.gain.setValueAtTime(0.0001, context.currentTime); gain.gain.exponentialRampToValueAtTime(0.22, context.currentTime + 0.03); gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.65);
+    oscillator.connect(gain); gain.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.7);
+  }
+
+  useEffect(() => {
+    if (!audioEnabled || needsAttention === 0) return;
+    beep(); const interval = window.setInterval(beep, 10_000); return () => window.clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioEnabled, needsAttention, cancellations.length]);
+
+  async function enableAlerts() {
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AudioContextClass) { audioContext.current ??= new AudioContextClass(); await audioContext.current.resume(); setAudioEnabled(true); }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return setPushStatus("unsupported");
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return setPushStatus("denied");
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) return setPushStatus("unsupported");
+    const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+    const serialized = subscription.toJSON();
+    const result = await savePushSubscriptionAction({ endpoint: subscription.endpoint, keys: { p256dh: serialized.keys?.p256dh || "", auth: serialized.keys?.auth || "" } });
+    setPushStatus(result.ok ? "enabled" : "unsupported");
+    if (result.ok) toast.success("Som e notificações ativados.");
+  }
+
+  const history = orders.filter((order) => order.status !== "pending" && !cancellations.some((cancelled) => cancelled.id === order.id));
+
+  return <div className="space-y-6">
+    {needsAttention > 0 && dismissedAttention !== attentionKey && <div role="alertdialog" aria-modal="true" aria-labelledby="kitchen-attention-title" className="fixed inset-0 z-[100] grid place-items-center bg-primary p-6 text-white"><div className="max-w-2xl text-center"><BellRing className="mx-auto mb-6 size-20 animate-pulse" /><h2 id="kitchen-attention-title" className="text-4xl font-black sm:text-6xl">{cancellations.length ? "Cancelamento urgente" : "Nova encomenda"}</h2><p className="mt-5 text-xl text-white/80">{cancellations.length ? `${cancellations.length} cancelamento(s) aguardam reconhecimento.` : `${pendingOrders.length} encomenda(s) aguardam decisão.`}</p><Button variant="secondary" size="lg" className="mt-8 min-w-48" onClick={() => setDismissedAttention(attentionKey)}>Abrir fila</Button></div></div>}
+    {!audioEnabled && <div className="rounded-2xl border-2 border-primary bg-primary p-5 text-white shadow-lg"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><BellRingIcon className="mt-1 size-6 shrink-0" /><div><h2 className="text-lg font-semibold">Ativar alertas da cozinha</h2><p className="text-sm text-white/80">Toque uma vez para permitir o alarme repetido e as notificações em segundo plano.</p></div></div><Button variant="secondary" size="lg" onClick={enableAlerts}><Volume2 /> Ativar agora</Button></div></div>}
+    <div className="flex flex-wrap gap-2"><Health ok={online} icon={online ? Wifi : WifiOff} label={online ? "Online" : "Sem ligação"} /><Health ok={realtime === "connected"} icon={Radio} label={realtime === "connected" ? "Tempo real ativo" : realtime === "connecting" ? "A ligar…" : "Tempo real com erro"} /><Health ok={audioEnabled} icon={audioEnabled ? Volume2 : VolumeX} label={audioEnabled ? "Som ativo" : "Som desligado"} /><Health ok={pushStatus === "enabled"} icon={BellRing} label={pushStatus === "enabled" ? "Push ativo" : "Push inativo"} /><Button size="sm" variant="ghost" onClick={() => router.refresh()}><RefreshCw /> Atualizar</Button></div>
+    {cancellations.length > 0 && <section className="space-y-3"><div className="flex items-center gap-2 text-destructive"><AlertTriangle /><h2 className="text-xl font-semibold">Cancelamentos por reconhecer</h2><Badge variant="rejected">{cancellations.length}</Badge></div><div className="grid gap-4 xl:grid-cols-2">{cancellations.map((order) => <CancellationCard key={order.id} order={order} />)}</div></section>}
+    <section className="space-y-3"><div className="flex items-center gap-2"><ChefHat className="text-primary" /><h2 className="text-xl font-semibold">Por aceitar</h2><Badge variant="pending">{pendingOrders.length}</Badge></div>{pendingOrders.length ? <div className="grid gap-4 xl:grid-cols-2">{pendingOrders.map((order) => <KitchenCard key={order.id} order={order} />)}</div> : <div className="rounded-2xl border border-dashed bg-card py-12 text-center"><Check className="mx-auto mb-3 size-10 text-primary" /><h3 className="font-semibold">Fila tratada</h3><p className="text-sm text-muted-foreground">Não existem encomendas à espera de decisão.</p></div>}</section>
+    {history.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Tratadas recentemente</h2><div className="grid gap-3 xl:grid-cols-2">{history.slice(0, 20).map((order) => <Card key={order.id}><CardContent className="flex items-center justify-between gap-3 p-4"><div><p className="font-mono text-xs text-muted-foreground">{order.order_number}</p><p className="font-semibold">{order.revision?.customer_name}</p></div><div className="flex items-center gap-2"><StatusBadge status={order.status} />{order.status === "accepted" && <Button asChild size="sm" variant="outline"><Link href={`/encomendas/${order.id}/imprimir`} target="_blank"><Printer /> Imprimir</Link></Button>}</div></CardContent></Card>)}</div></section>}
+  </div>;
+}
+
+function Health({ ok, icon: Icon, label }: { ok: boolean; icon: typeof Wifi; label: string }) { return <Badge variant={ok ? "accepted" : "outline"} className="gap-1.5 py-1.5"><Icon className="size-3.5" />{label}</Badge>; }
+
+function KitchenCard({ order }: { order: Order }) {
+  const [rejectOpen, setRejectOpen] = useState(false); const [reason, setReason] = useState("Sem disponibilidade"); const [pending, startTransition] = useTransition(); const router = useRouter();
+  const decide = (kind: "accept" | "reject") => startTransition(async () => { const result = kind === "accept" ? await acceptOrderAction(order.id, order.current_version) : await rejectOrderAction(order.id, order.current_version, reason); if (!result.ok) { toast.error(result.message); return; } toast.success(result.message); setRejectOpen(false); router.refresh(); });
+  return <Card role="article" aria-label={order.order_number} className="overflow-hidden border-amber-200"><div className="h-1.5 bg-amber-400" /><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs font-semibold text-muted-foreground">{order.order_number} · v{order.current_version}</p><CardTitle className="mt-1">{order.revision?.customer_name}</CardTitle></div>{order.current_version > 1 && <Badge variant="info">Revisão</Badge>}</div></CardHeader><CardContent className="space-y-3 text-sm"><p><strong>Levantamento:</strong> {order.revision && formatDateTime(order.revision.pickup_at)} · {order.pickup_store?.name}</p><p className="text-muted-foreground"><strong>Origem:</strong> {order.ordering_store?.name}</p><div className="rounded-xl bg-muted p-3">{order.revision?.items?.map((item) => <p key={item.id} className="flex justify-between gap-3"><span>{item.product_name}</span><strong>{formatQuantity(item.quantity)} {item.unit_label}</strong></p>) || <p className="text-muted-foreground">Abra o detalhe para consultar os artigos.</p>}</div>{order.revision?.general_notes && <p className="rounded-xl bg-amber-50 p-3"><strong>Notas:</strong> {order.revision.general_notes}</p>}</CardContent><CardFooter className="grid grid-cols-3"><Button asChild variant="ghost" size="lg"><Link href={`/cozinha/encomendas/${order.id}`}>Detalhes</Link></Button><Button variant="outline" size="lg" onClick={() => setRejectOpen(true)}><X /> Rejeitar</Button><Button size="lg" disabled={pending} onClick={() => decide("accept")}>{pending ? <LoaderCircle className="animate-spin" /> : <Check />} Aceitar</Button></CardFooter><Dialog open={rejectOpen} onOpenChange={setRejectOpen}><DialogContent><DialogHeader><DialogTitle>Rejeitar {order.order_number}</DialogTitle><DialogDescription>O motivo será enviado ao cliente por email.</DialogDescription></DialogHeader><Input value={reason} onChange={(event) => setReason(event.target.value)} autoFocus /><DialogFooter><Button variant="outline" onClick={() => setRejectOpen(false)}>Voltar</Button><Button variant="destructive" disabled={pending || !reason.trim()} onClick={() => decide("reject")}>{pending && <LoaderCircle className="animate-spin" />}Confirmar rejeição</Button></DialogFooter></DialogContent></Dialog></Card>;
+}
+
+function CancellationCard({ order }: { order: Order }) { const [pending, startTransition] = useTransition(); const router = useRouter(); return <Card role="article" aria-label={`${order.order_number} cancelada`} className="border-red-300 bg-red-50"><CardHeader><CardTitle className="text-red-900">{order.order_number} foi cancelada</CardTitle></CardHeader><CardContent className="text-sm text-red-900"><p><strong>Cliente:</strong> {order.revision?.customer_name}</p><p><strong>Levantamento:</strong> {order.revision && formatDateTime(order.revision.pickup_at)} · {order.pickup_store?.name}</p></CardContent><CardFooter><Button className="w-full" variant="destructive" disabled={pending} onClick={() => startTransition(async () => { const result = await acknowledgeCancellationAction(order.id); if (!result.ok) { toast.error(result.message); return; } toast.success(result.message); router.refresh(); })}>{pending && <LoaderCircle className="animate-spin" />}Reconhecer cancelamento</Button></CardFooter></Card>; }

@@ -1,0 +1,8 @@
+import Link from "next/link";
+import { AlertTriangle, BellRing, Building2, ClipboardList, Settings, Users } from "lucide-react";
+import { getAdminOverview } from "@/lib/data";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
+
+export default async function AdminPage() { const overview = await getAdminOverview(); const metrics = [[ClipboardList, "Encomendas", overview.orders], [BellRing, "Por aceitar", overview.pending], [Building2, "Lojas ativas", overview.stores], [AlertTriangle, "Entregas com erro", overview.failures]] as const; return <><PageHeader title="Administração" description="Configure a operação e acompanhe a saúde do fluxo de encomendas." /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([Icon, label, value]) => <Card key={label}><CardContent className="flex items-center gap-4 p-5"><span className="grid size-12 place-items-center rounded-xl bg-secondary"><Icon className="text-primary" /></span><div><p className="text-sm text-muted-foreground">{label}</p><p className="text-3xl font-semibold">{value}</p></div></CardContent></Card>)}</div><div className="mt-6 grid gap-4 md:grid-cols-3"><Button asChild variant="outline" className="h-20 justify-start px-5"><Link href="/admin/utilizadores"><Users />Gerir equipa e acessos</Link></Button><Button asChild variant="outline" className="h-20 justify-start px-5"><Link href="/admin/catalogo"><ClipboardList />Gerir catálogo</Link></Button><Button asChild variant="outline" className="h-20 justify-start px-5"><Link href="/admin/definicoes"><Settings />Regras e locais</Link></Button></div></>; }
