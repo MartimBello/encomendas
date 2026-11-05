@@ -1,5 +1,5 @@
 begin;
-select plan(27);
+select plan(31);
 
 select has_table('public', 'seasonal_campaigns', 'seasonal campaigns table exists');
 select has_table('public', 'seasonal_products', 'seasonal products table exists');
@@ -51,12 +51,16 @@ select lives_ok(
 );
 
 select is((select campaign_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'), '49000000-0000-4000-8000-000000000001'::uuid, 'order keeps its campaign');
-select is((select status::text from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'), 'pending', 'seasonal order enters the normal pending workflow');
+select is((select status::text from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'), 'accepted', 'seasonal order is confirmed automatically');
+select ok((select accepted_revision_id = current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'), 'automatic confirmation pins the created revision');
 select is((select product_name from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 'Peru assado', 'special menu name is snapshotted');
 select is((select variation_name from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 'Com recheio', 'selected variation is snapshotted');
 select is((select product_id from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), null::uuid, 'seasonal snapshot does not depend on the regular catalog');
 select is((select seasonal_product_id from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), '49100000-0000-4000-8000-000000000001'::uuid, 'seasonal snapshot retains the product identity for stock accounting');
-select is((select count(*)::integer from public.notification_outbox where kind = 'new_order' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 1, 'seasonal order queues the kitchen push');
+select is((select count(*)::integer from public.notification_outbox where kind = 'new_order' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 0, 'seasonal order does not queue a kitchen acceptance push');
+select is((select count(*)::integer from public.notification_outbox where kind = 'order_accepted' and channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 1, 'seasonal order queues its confirmation email');
+select is((select recipient from public.notification_outbox where kind = 'order_accepted' and channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 'sazonal@example.pt', 'seasonal confirmation email keeps its recipient');
+select is((select count(*)::integer from public.order_events where event_type = 'accepted' and metadata ->> 'automatic' = 'true' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 1, 'automatic confirmation is audited');
 select is(
   public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440202', '49000000-0000-4000-8000-000000000001',
@@ -74,23 +78,21 @@ select throws_ok(
     '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, null
   ) $$,
   'P0001', 'Stock insuficiente para um ou mais artigos sazonais.',
-  'pending seasonal orders reserve stock'
+  'automatically accepted seasonal orders reserve stock'
 );
 
-set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a003","role":"authenticated"}';
 select lives_ok(
-  $$ select public.reject_order((select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'), 1, 'Teste de stock') $$,
-  'kitchen can reject the stock-reserving order'
+  $$ select public.cancel_order((select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')) $$,
+  'store can cancel the stock-reserving seasonal order'
 );
 
-set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
 select lives_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440206', '49000000-0000-4000-8000-000000000001',
     'Cliente Com Stock', 'com-stock@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
     '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, null
   ) $$,
-  'rejected seasonal orders release stock'
+  'cancelled seasonal orders release stock'
 );
 
 select throws_ok(
@@ -105,7 +107,7 @@ select throws_ok(
 
 select throws_ok(
   $$ select public.submit_order_revision(
-    (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'),
+    (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206'),
     'Cliente Sazonal', 'sazonal@example.pt', '912345678',
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),

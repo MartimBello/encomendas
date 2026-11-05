@@ -3,7 +3,7 @@
 import { useActionState, useTransition } from "react";
 import { LoaderCircle, Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
+import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateCategoryAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
 import type { Location, OrderingSettings, Product } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
 
@@ -69,7 +70,29 @@ export function WindowForm({ stores }: { stores: Location[] }) {
   </form>;
 }
 
-export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" placeholder="Nova categoria" required /><Button disabled={pending}><Plus />Adicionar</Button><Message state={state} /></form>; }
+export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" aria-label="Nome da nova categoria" placeholder="Nova categoria" required /><Input name="position" aria-label="Ordem da nova categoria" type="number" min="0" max="10000" defaultValue="0" className="sm:w-32" required /><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar</Button><Message state={state} /></form>; }
+
+function CategoryEditForm({ category }: { category: { id: string; name: string; position: number } }) {
+  const [state, action, pending] = useActionState(updateCategoryAction, initial);
+  const fieldId = `category-${category.id}`;
+  return <Dialog>
+    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Editar categoria · {category.name}</DialogTitle><DialogDescription>Atualize o nome e a ordem em que a categoria aparece nos formulários.</DialogDescription></DialogHeader>
+      <form action={action} className="flex flex-col gap-4">
+        <input type="hidden" name="category_id" value={category.id} />
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={category.name} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-position`}>Ordem</Label><Input id={`${fieldId}-position`} name="position" type="number" min="0" max="10000" defaultValue={category.position} required /></div>
+        <Message state={state} />
+        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+export function CategoryTable({ categories }: { categories: { id: string; name: string; position: number }[] }) {
+  return <Table><TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead>Ordem</TableHead><TableHead /></TableRow></TableHeader><TableBody>{categories.map((category) => <TableRow key={category.id}><TableCell className="font-medium">{category.name}</TableCell><TableCell>{category.position}</TableCell><TableCell className="text-right"><CategoryEditForm category={category} /></TableCell></TableRow>)}</TableBody></Table>;
+}
 
 export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createProductAction, initial);

@@ -79,8 +79,25 @@ export async function createPickupWindowAction(_previous: ActionResult, formData
 }
 
 export async function createCategoryAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
-  await requireProfile(["admin"]); const parsed = z.string().trim().min(2).safeParse(formData.get("name")); if (!parsed.success) return { ok: false, message: "Indique o nome da categoria." };
-  const supabase = await createClient(); const { error } = await supabase!.from("product_categories").insert({ name: parsed.data }); if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/catalogo"); return { ok: true, message: "Categoria criada." };
+  await requireProfile(["admin"]);
+  const parsed = z.object({ name: z.string().trim().min(2).max(120), position: z.coerce.number().int().min(0).max(10_000) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Indique o nome e a ordem da categoria." };
+  const supabase = await createClient(); const { error } = await supabase!.from("product_categories").insert(parsed.data); if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/catalogo"); return { ok: true, message: "Categoria criada." };
+}
+
+export async function updateCategoryAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireProfile(["admin"]);
+  const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2).max(120), position: z.coerce.number().int().min(0).max(10_000) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Indique o nome e a ordem da categoria." };
+  const { category_id, ...updates } = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase!.from("product_categories").update(updates).eq("id", category_id).select("id").maybeSingle();
+  if (error || !data) return { ok: false, message: databaseError(error, "A categoria não existe ou não pôde ser atualizada.") };
+  revalidatePath("/admin/catalogo");
+  revalidatePath("/admin/sazonais");
+  revalidatePath("/loja/encomendas/nova");
+  revalidatePath("/loja/sazonais/[campaignId]", "page");
+  return { ok: true, message: "Categoria atualizada." };
 }
 
 export async function createProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {

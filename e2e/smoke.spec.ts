@@ -51,8 +51,24 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
 test("seasonal campaigns expose their special menu and pickup ranges", async ({ browser }, testInfo) => {
   const productName = `Produto Playwright ${testInfo.project.name}`;
   const editedProductName = `${productName} editado`;
+  const categoryName = `Categoria Playwright ${testInfo.project.name} ${Date.now()}`;
+  const editedCategoryName = `${categoryName} editada`;
   const admin = await browser.newPage();
   await login(admin, "admin@encomendas.local");
+  await admin.goto("/admin/catalogo");
+  await admin.getByLabel("Nome da nova categoria").fill(categoryName);
+  await admin.getByLabel("Ordem da nova categoria").fill("100");
+  await admin.getByRole("button", { name: "Adicionar", exact: true }).click();
+  await expect(admin.getByText("Categoria criada.")).toBeVisible();
+  const categoryRow = admin.getByRole("row").filter({ hasText: categoryName });
+  await categoryRow.getByRole("button", { name: "Editar" }).click();
+  const categoryDialog = admin.getByRole("dialog", { name: `Editar categoria · ${categoryName}` });
+  await categoryDialog.getByLabel("Nome").fill(editedCategoryName);
+  await categoryDialog.getByLabel("Ordem").fill("110");
+  await categoryDialog.getByRole("button", { name: "Guardar alterações" }).click();
+  await expect(categoryDialog.getByText("Categoria atualizada.")).toBeVisible();
+  await categoryDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(admin.getByRole("row").filter({ hasText: editedCategoryName })).toBeVisible();
   await admin.goto("/admin/sazonais");
   await expect(admin.getByRole("heading", { name: "Campanhas sazonais" })).toBeVisible();
   await expect(admin.getByLabel("Categoria")).toHaveValue("20000000-0000-4000-8000-000000000001");
@@ -127,9 +143,21 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store.getByText("Sem recheio", { exact: true })).toBeVisible();
   await store.getByLabel("Data de levantamento").click();
   await store.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
+  await store.keyboard.press("Escape");
   await store.getByLabel("Loja de levantamento").click();
   await store.getByRole("option").first().click();
   await expect(store.getByLabel("Hora de levantamento")).toBeEnabled();
+  await store.getByLabel("Hora de levantamento").click();
+  await store.getByRole("option").first().click();
+  await store.getByLabel("Nome do cliente").fill(`Cliente sazonal ${testInfo.project.name}`);
+  await store.getByLabel(/^Email/).fill(`sazonal-${testInfo.project.name.toLowerCase().replace(/\s+/g, "-")}@example.pt`);
+  await store.getByLabel("Telefone").fill("912345678");
+  await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
+  await store.getByLabel(/^Observação/).fill("Bem passado");
+  await store.getByRole("button", { name: "Enviar encomenda sazonal" }).click();
+  await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
+  await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
+  await expect(store.getByRole("button", { name: /Aceitar|Rejeitar/ })).toHaveCount(0);
   await store.close();
 });
 
