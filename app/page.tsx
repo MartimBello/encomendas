@@ -1,69 +1,20 @@
-import Image from "next/image";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { Database, ShieldCheck, Tablet } from "lucide-react";
+import { getCurrentProfile, homeForRole } from "@/lib/auth";
+import { getSupabaseEnv } from "@/lib/supabase/env";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+async function Entry() {
+  const { configured } = getSupabaseEnv();
+  if (!configured) {
+    return <main className="mx-auto flex min-h-dvh max-w-4xl items-center px-5 py-12"><Card className="w-full overflow-hidden"><div className="h-2 bg-primary" /><CardHeader className="pb-2 text-center"><div className="mx-auto mb-3 grid size-14 place-items-center rounded-2xl bg-primary text-white"><Tablet className="size-7" /></div><CardTitle className="text-3xl">Encomendas</CardTitle><p className="text-muted-foreground">A aplicação está pronta para ligar ao Supabase local.</p></CardHeader><CardContent className="grid gap-3 pt-4 md:grid-cols-3">{[[Database, "1. Iniciar dados", "Execute npm run supabase:start e copie as chaves apresentadas."], [ShieldCheck, "2. Configurar ambiente", "Crie .env.local a partir de .env.example."], [Tablet, "3. Abrir a aplicação", "Reinicie npm run dev e entre com uma conta ativa."]].map(([Icon, title, body]) => { const Glyph = Icon as typeof Database; return <div key={String(title)} className="rounded-xl bg-muted p-4"><Glyph className="mb-3 size-5 text-primary" /><h2 className="font-semibold">{String(title)}</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{String(body)}</p></div>; })}</CardContent></Card></main>;
+  }
+  const profile = await getCurrentProfile();
+  redirect(profile ? homeForRole(profile.role) : "/login");
+}
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+  return <Suspense fallback={<main className="mx-auto max-w-4xl p-8"><Skeleton className="h-96 w-full" /></main>}><Entry /></Suspense>;
 }
