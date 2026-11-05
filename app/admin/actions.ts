@@ -7,6 +7,7 @@ import { nudgeNotificationWorker } from "@/lib/notification-worker";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { databaseError, settingsSchema, type ActionResult } from "@/lib/validation";
+import { inputLocalToUtc } from "@/lib/dates";
 
 export async function inviteUserAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
@@ -95,4 +96,62 @@ export async function retryNotificationsAction(): Promise<ActionResult> {
   const started = await nudgeNotificationWorker(50);
   revalidatePath("/admin/notificacoes");
   return started ? { ok: true, message: "Nova tentativa iniciada." } : { ok: false, message: "As entregas ficaram em fila para a próxima execução." };
+}
+
+export async function createSeasonalCampaignAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const actor = await requireProfile(["admin"]);
+  const parsed = z.object({
+    name: z.string().trim().min(2).max(120),
+    slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    description: z.string().trim().max(1000),
+    opens_date: z.iso.date(), opens_time: z.string().regex(/^\d{2}:\d{2}$/),
+    closes_date: z.iso.date(), closes_time: z.string().regex(/^\d{2}:\d{2}$/),
+  }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Verifique o nome, identificador e período de aceitação." };
+  const opensAt = inputLocalToUtc(`${parsed.data.opens_date}T${parsed.data.opens_time}`);
+  const closesAt = inputLocalToUtc(`${parsed.data.closes_date}T${parsed.data.closes_time}`);
+  if (new Date(closesAt) <= new Date(opensAt)) return { ok: false, message: "O fim da aceitação tem de ser posterior ao início." };
+  const supabase = await createClient();
+  const { error } = await supabase!.from("seasonal_campaigns").insert({ name: parsed.data.name, slug: parsed.data.slug, description: parsed.data.description, ordering_opens_at: opensAt, ordering_closes_at: closesAt, active: false, created_by: actor.id, updated_by: actor.id });
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/admin/sazonais"); return { ok: true, message: "Campanha criada como inativa." };
+}
+
+export async function toggleSeasonalCampaignAction(campaignId: string, active: boolean): Promise<ActionResult> {
+  const actor = await requireProfile(["admin"]); const supabase = await createClient();
+  const { error } = await supabase!.from("seasonal_campaigns").update({ active, updated_by: actor.id }).eq("id", campaignId);
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/admin/sazonais"); revalidatePath("/loja/sazonais"); return { ok: true, message: active ? "Campanha publicada." : "Campanha desativada." };
+}
+
+export async function createSeasonalProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireProfile(["admin"]);
+  const parsed = z.object({ campaign_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
+  if (!parsed.success) return { ok: false, message: "Verifique os dados do artigo sazonal." };
+  const supabase = await createClient(); const { error } = await supabase!.from("seasonal_products").insert(parsed.data);
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/admin/sazonais"); return { ok: true, message: "Artigo adicionado ao menu especial." };
+}
+
+export async function createSeasonalPickupSlotAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireProfile(["admin"]);
+  const parsed = z.object({ campaign_id: z.uuid(), location_ids: z.string().min(36), pickup_dates: z.string().min(10), opens_at: z.string().regex(/^\d{2}:\d{2}$/), closes_at: z.string().regex(/^\d{2}:\d{2}$/), slot_minutes: z.coerce.number().int().min(5).max(240) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Escolha a campanha, uma ou mais lojas, pelo menos um dia e o intervalo de abertura." };
+  const dates = parsed.data.pickup_dates.split(",").filter((value) => z.iso.date().safeParse(value).success);
+  const locationIds = parsed.data.location_ids.split(",").filter((value) => z.uuid().safeParse(value).success);
+  if (!dates.length || !locationIds.length || parsed.data.closes_at <= parsed.data.opens_at) return { ok: false, message: "Escolha dias, lojas e um intervalo de abertura válido." };
+  const rows = locationIds.flatMap((locationId) => dates.map((pickupDate) => ({ campaign_id: parsed.data.campaign_id, location_id: locationId, pickup_date: pickupDate, opens_at: parsed.data.opens_at, closes_at: parsed.data.closes_at, slot_minutes: parsed.data.slot_minutes })));
+  const supabase = await createClient(); const { error } = await supabase!.from("seasonal_pickup_slots").insert(rows);
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/admin/sazonais"); return { ok: true, message: "Dia e hora de levantamento adicionados." };
+}
+
+export async function toggleSeasonalProductAction(productId: string, active: boolean): Promise<ActionResult> {
+  await requireProfile(["admin"]); const supabase = await createClient(); const { error } = await supabase!.from("seasonal_products").update({ active }).eq("id", productId);
+  if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/sazonais"); return { ok: true, message: "Artigo atualizado." };
+}
+
+export async function toggleSeasonalPickupSlotAction(slotId: string, active: boolean): Promise<ActionResult> {
+  await requireProfile(["admin"]); const supabase = await createClient(); const { error } = await supabase!.from("seasonal_pickup_slots").update({ active }).eq("id", slotId);
+  if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/sazonais"); return { ok: true, message: "Horário atualizado." };
 }

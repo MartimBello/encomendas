@@ -22,7 +22,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
   return <>
     <PageHeader
       title={order.order_number}
-      description={`Versão ${order.current_version} · criada ${formatDateTime(order.created_at)}`}
+      description={`${order.campaign ? `${order.campaign.name} · ` : ""}Versão ${order.current_version} · criada ${formatDateTime(order.created_at)}`}
       actions={<StoreOrderActions order={order} />}
     />
     <div className="mb-5">

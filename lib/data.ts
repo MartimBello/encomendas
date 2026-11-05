@@ -1,23 +1,26 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Location, NotificationJob, Order, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product } from "@/lib/domain";
+import type { Location, NotificationJob, Order, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product, SeasonalCampaign } from "@/lib/domain";
 
 const orderListSelect = `
-  id, order_number, ordering_store_id, pickup_store_id, status, current_version,
+  id, order_number, campaign_id, ordering_store_id, pickup_store_id, status, current_version,
   current_revision_id, accepted_revision_id, accepted_at, rejected_at, cancelled_at,
   rejection_reason, cancellation_requires_ack, cancellation_acknowledged_at, created_at, updated_at,
   ordering_store:locations!orders_ordering_store_id_fkey(id,name,address),
   pickup_store:locations!orders_pickup_store_id_fkey(id,name,address),
+  campaign:seasonal_campaigns(id,name,slug),
   revision:order_revisions!orders_current_revision_fk(id,order_id,version,customer_name,customer_email,customer_phone,pickup_store_id,pickup_at,general_notes,created_at,anonymized_at)
 `;
 
-export async function getOrders(options?: { status?: string; search?: string; limit?: number }) {
+export async function getOrders(options?: { status?: string; search?: string; limit?: number; kind?: "regular" | "seasonal" }) {
   const supabase = await createClient();
   if (!supabase) return [] as Order[];
   let query = supabase.from("orders").select(orderListSelect).order("updated_at", { ascending: false }).limit(options?.limit ?? 100);
   if (options?.status && options.status !== "all") query = query.eq("status", options.status as OrderStatus);
   if (options?.search) query = query.ilike("order_number", `%${options.search.replace(/[%_,()]/g, "")}%`);
+  if (options?.kind === "regular") query = query.is("campaign_id", null);
+  if (options?.kind === "seasonal") query = query.not("campaign_id", "is", null);
   const { data, error } = await query;
   if (error) throw error;
   const orders = (data ?? []) as unknown as Order[];
@@ -27,6 +30,24 @@ export async function getOrders(options?: { status?: string; search?: string; li
     for (const order of orders) if (order.revision) order.revision.items = (items ?? []).filter((item) => item.revision_id === order.revision?.id);
   }
   return orders;
+}
+
+export async function getSeasonalCampaigns(includeInactive = false) {
+  const supabase = await createClient();
+  if (!supabase) return [] as SeasonalCampaign[];
+  let query = supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").order("ordering_opens_at", { ascending: false });
+  if (!includeInactive) query = query.eq("active", true);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as unknown as SeasonalCampaign[];
+}
+
+export async function getSeasonalCampaign(campaignId: string) {
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").eq("id", campaignId).maybeSingle();
+  if (error) throw error;
+  return data as unknown as SeasonalCampaign | null;
 }
 
 export async function getOrder(orderId: string) {

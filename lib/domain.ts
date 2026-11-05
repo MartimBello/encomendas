@@ -68,6 +68,45 @@ export interface PickupWindow {
   active: boolean;
 }
 
+export interface SeasonalCampaign {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  ordering_opens_at: string;
+  ordering_closes_at: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  products?: SeasonalProduct[];
+  pickup_slots?: SeasonalPickupSlot[];
+}
+
+export interface SeasonalProduct {
+  id: string;
+  campaign_id: string;
+  name: string;
+  description: string;
+  unit_label: string;
+  minimum_quantity: number;
+  quantity_step: number;
+  requires_note: boolean;
+  active: boolean;
+  position: number;
+}
+
+export interface SeasonalPickupSlot {
+  id: string;
+  campaign_id: string;
+  location_id: string;
+  pickup_date: string;
+  opens_at: string;
+  closes_at: string;
+  slot_minutes: number;
+  active: boolean;
+  location?: Pick<Location, "id" | "name" | "address"> | null;
+}
+
 export interface OrderItem {
   id?: string;
   product_id: string | null;
@@ -97,6 +136,7 @@ export interface OrderRevision {
 export interface Order {
   id: string;
   order_number: string;
+  campaign_id: string | null;
   ordering_store_id: string;
   pickup_store_id: string;
   status: OrderStatus;
@@ -113,6 +153,7 @@ export interface Order {
   updated_at: string;
   ordering_store?: Pick<Location, "id" | "name" | "address"> | null;
   pickup_store?: Pick<Location, "id" | "name" | "address"> | null;
+  campaign?: Pick<SeasonalCampaign, "id" | "name" | "slug"> | null;
   revision?: OrderRevision | null;
 }
 

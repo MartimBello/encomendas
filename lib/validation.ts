@@ -21,6 +21,19 @@ export const orderPayloadSchema = z.object({
   items: z.array(orderItemSchema).min(1, "Adicione pelo menos um artigo.").max(100),
 });
 
+export const seasonalOrderPayloadSchema = z.object({
+  idempotency_key: databaseUuid,
+  campaign_id: databaseUuid,
+  ordering_store_id: databaseUuid.nullable().optional(),
+  customer_name: z.string().trim().min(2, "Indique o nome do cliente.").max(120),
+  customer_email: z.email("Indique um email válido.").toLowerCase(),
+  customer_phone: z.string().trim().max(40).default(""),
+  pickup_slot_id: databaseUuid,
+  pickup_at: z.iso.datetime({ offset: true }),
+  general_notes: z.string().trim().max(2000).default(""),
+  items: z.array(orderItemSchema).min(1, "Adicione pelo menos um artigo.").max(100),
+});
+
 export const settingsSchema = z.object({
   phone_required: z.boolean(),
   general_notes_required: z.boolean(),
@@ -30,6 +43,7 @@ export const settingsSchema = z.object({
 });
 
 export type OrderPayload = z.infer<typeof orderPayloadSchema>;
+export type SeasonalOrderPayload = z.infer<typeof seasonalOrderPayloadSchema>;
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { nudgeNotificationWorker } from "@/lib/notification-worker";
 import { createClient } from "@/lib/supabase/server";
-import { databaseError, orderPayloadSchema, type ActionResult, type OrderPayload } from "@/lib/validation";
+import { databaseError, orderPayloadSchema, seasonalOrderPayloadSchema, type ActionResult, type OrderPayload, type SeasonalOrderPayload } from "@/lib/validation";
 
 export async function createOrderAction(payload: OrderPayload): Promise<ActionResult<{ orderId: string }>> {
   const profile = await requireProfile(["store", "admin"]);
@@ -27,6 +27,30 @@ export async function createOrderAction(payload: OrderPayload): Promise<ActionRe
   revalidatePath("/loja/encomendas");
   await nudgeNotificationWorker();
   return { ok: true, data: { orderId: String(data) }, message: "Encomenda enviada à cozinha." };
+}
+
+export async function createSeasonalOrderAction(payload: SeasonalOrderPayload): Promise<ActionResult<{ orderId: string }>> {
+  const profile = await requireProfile(["store", "admin"]);
+  const parsed = seasonalOrderPayloadSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: "Confirme os campos e adicione pelo menos um artigo." };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, message: "Serviço de dados indisponível." };
+  const { data, error } = await supabase.rpc("create_seasonal_order", {
+    p_idempotency_key: parsed.data.idempotency_key,
+    p_campaign_id: parsed.data.campaign_id,
+    p_customer_name: parsed.data.customer_name,
+    p_customer_email: parsed.data.customer_email,
+    p_customer_phone: parsed.data.customer_phone,
+    p_pickup_slot_id: parsed.data.pickup_slot_id,
+    p_pickup_at: parsed.data.pickup_at,
+    p_general_notes: parsed.data.general_notes,
+    p_items: parsed.data.items,
+    p_ordering_store_id: profile.role === "admin" ? parsed.data.ordering_store_id ?? undefined : undefined,
+  });
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/loja/sazonais"); revalidatePath("/cozinha/sazonais");
+  await nudgeNotificationWorker();
+  return { ok: true, data: { orderId: String(data) }, message: "Encomenda sazonal enviada à cozinha." };
 }
 
 export async function reviseOrderAction(payload: OrderPayload): Promise<ActionResult<{ orderId: string }>> {
@@ -57,6 +81,7 @@ export async function acceptOrderAction(orderId: string, expectedVersion: number
   const { error } = await supabase!.rpc("accept_order", { p_order_id: orderId, p_expected_version: expectedVersion });
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/cozinha");
+  revalidatePath("/cozinha/sazonais");
   await nudgeNotificationWorker();
   return { ok: true, message: "Encomenda aceite e confirmação preparada." };
 }
@@ -67,6 +92,7 @@ export async function rejectOrderAction(orderId: string, expectedVersion: number
   const { error } = await supabase!.rpc("reject_order", { p_order_id: orderId, p_expected_version: expectedVersion, p_reason: reason || "Sem disponibilidade" });
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/cozinha");
+  revalidatePath("/cozinha/sazonais");
   await nudgeNotificationWorker();
   return { ok: true, message: "Encomenda rejeitada." };
 }
@@ -77,6 +103,7 @@ export async function cancelOrderAction(orderId: string): Promise<ActionResult> 
   const { error } = await supabase!.rpc("cancel_order", { p_order_id: orderId });
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/loja/encomendas");
+  revalidatePath("/loja/sazonais");
   revalidatePath(`/loja/encomendas/${orderId}`);
   await nudgeNotificationWorker();
   return { ok: true, message: "Encomenda cancelada." };
@@ -88,6 +115,7 @@ export async function acknowledgeCancellationAction(orderId: string): Promise<Ac
   const { error } = await supabase!.rpc("acknowledge_cancellation", { p_order_id: orderId });
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/cozinha");
+  revalidatePath("/cozinha/sazonais");
   return { ok: true, message: "Cancelamento reconhecido." };
 }
 

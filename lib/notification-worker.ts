@@ -14,6 +14,7 @@ export async function nudgeNotificationWorker(limit = 20) {
       },
       body: JSON.stringify({ limit }),
       cache: "no-store",
+      signal: AbortSignal.timeout(2_000),
     });
     return response.ok;
   } catch {

@@ -53,3 +53,26 @@ from (values
 ) locations(location_id)
 cross join generate_series(1, 6) weekday
 on conflict do nothing;
+
+-- Campanha de demonstração apenas para o ambiente Supabase local.
+insert into public.seasonal_campaigns (
+  id, name, slug, description, ordering_opens_at, ordering_closes_at, active
+) values (
+  '40000000-0000-4000-8000-000000000001', 'Natal — demonstração local', 'natal-demonstracao-local',
+  'Exemplo de menu e levantamentos sazonais configurável na administração.', now() - interval '1 day', now() + interval '30 days', true
+) on conflict (id) do nothing;
+
+insert into public.seasonal_products (
+  id, campaign_id, name, description, unit_label, minimum_quantity, quantity_step, requires_note, position
+) values
+  ('41000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'Peru assado', 'Peru assado pronto a servir', 'kg', 2, 0.5, true, 10),
+  ('41000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'Bolo-rei', 'Receita tradicional', 'un.', 1, 1, false, 20)
+on conflict (id) do nothing;
+
+insert into public.seasonal_pickup_slots (
+  id, campaign_id, location_id, pickup_date, opens_at, closes_at, slot_minutes
+) values
+  ('42000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', current_date + 14, '09:00', '18:00', 30),
+  ('42000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', current_date + 15, '09:00', '14:00', 30),
+  ('42000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000003', current_date + 14, '10:00', '19:00', 30)
+on conflict (id) do nothing;

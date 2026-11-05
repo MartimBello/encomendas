@@ -1,7 +1,8 @@
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  
+
   "graphql_public": {
           Tables: {
             [_ in never]: never
@@ -34,7 +35,6 @@ export type Database = {
                     "active"?: boolean,"address"?: string,"created_at"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["location_type"],"name"?: string,"updated_at"?: string
                   }
                   Relationships: [
-                    
                   ]
                 },"notification_delivery_attempts": {
                   Row: {
@@ -160,18 +160,18 @@ isOneToOne: false
                     "booking_horizon_days"?: number,"general_notes_required"?: boolean,"id"?: boolean,"minimum_lead_minutes"?: number,"phone_required"?: boolean,"retention_months"?: number,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
-                    
+
                   ]
                 },"orders": {
                   Row: {
-                    "accepted_at": string | null,"accepted_by": string | null,"accepted_revision_id": string | null,"cancellation_acknowledged_at": string | null,"cancellation_acknowledged_by": string | null,"cancellation_requires_ack": boolean,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string,"current_revision_id": string | null,"current_version": number,"id": string,"idempotency_key": string,"order_number": string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at": string | null,"rejected_by": string | null,"rejection_reason": string | null,"status": Database["public"]['Enums']["order_status"],"updated_at": string,"can_read_order": boolean | null
+                    "accepted_at": string | null,"accepted_by": string | null,"accepted_revision_id": string | null,"campaign_id": string | null,"cancellation_acknowledged_at": string | null,"cancellation_acknowledged_by": string | null,"cancellation_requires_ack": boolean,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string,"current_revision_id": string | null,"current_version": number,"id": string,"idempotency_key": string,"order_number": string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at": string | null,"rejected_by": string | null,"rejection_reason": string | null,"status": Database["public"]['Enums']["order_status"],"updated_at": string,"can_read_order": boolean | null
                   }
                   ComputedFields: "can_read_order"
                   Insert: {
-                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by": string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key": string,"order_number"?: string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
+                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by": string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key": string,"order_number"?: string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
                   }
                   Update: {
-                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key"?: string,"order_number"?: string,"ordering_store_id"?: string,"pickup_store_id"?: string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
+                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key"?: string,"order_number"?: string,"ordering_store_id"?: string,"pickup_store_id"?: string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -179,6 +179,12 @@ isOneToOne: false
       columns: ["accepted_revision_id"]
 isOneToOne: false
       referencedRelation: "order_revisions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "orders_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "seasonal_campaigns"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "orders_current_revision_fk"
@@ -232,7 +238,7 @@ isOneToOne: false
                     "active"?: boolean,"created_at"?: string,"id"?: string,"name"?: string,"position"?: number,"updated_at"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"products": {
                   Row: {
@@ -286,7 +292,66 @@ isOneToOne: false
                     "auth_key"?: string,"created_at"?: string,"endpoint"?: string,"id"?: string,"last_seen_at"?: string,"p256dh"?: string,"user_agent"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
+                  ]
+                },"seasonal_campaigns": {
+                  Row: {
+                    "active": boolean,"created_at": string,"created_by": string | null,"description": string,"id": string,"name": string,"ordering_closes_at": string,"ordering_opens_at": string,"slug": string,"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description"?: string,"id"?: string,"name": string,"ordering_closes_at": string,"ordering_opens_at": string,"slug": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description"?: string,"id"?: string,"name"?: string,"ordering_closes_at"?: string,"ordering_opens_at"?: string,"slug"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                  ]
+                },"seasonal_pickup_slots": {
+                  Row: {
+                    "active": boolean,"campaign_id": string,"closes_at": string,"created_at": string,"id": string,"location_id": string,"opens_at": string,"pickup_date": string,"slot_minutes": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"campaign_id": string,"closes_at": string,"created_at"?: string,"id"?: string,"location_id": string,"opens_at": string,"pickup_date": string,"slot_minutes"?: number
+                  }
+                  Update: {
+                    "active"?: boolean,"campaign_id"?: string,"closes_at"?: string,"created_at"?: string,"id"?: string,"location_id"?: string,"opens_at"?: string,"pickup_date"?: string,"slot_minutes"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "seasonal_pickup_slots_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "seasonal_campaigns"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "seasonal_pickup_slots_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"seasonal_products": {
+                  Row: {
+                    "active": boolean,"campaign_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"unit_label": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"campaign_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"campaign_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "seasonal_products_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "seasonal_campaigns"
+      referencedColumns: ["id"]
+    }
                   ]
                 }
           }
@@ -308,6 +373,9 @@ isOneToOne: false
                            },
 "assert_valid_items":
 { Args: { "p_items": Json }; Returns: undefined
+                           },
+"assert_valid_seasonal_items":
+{ Args: { "p_campaign_id": string,"p_items": Json }; Returns: undefined
                            },
 "can_read_order":
 { Args: { "target": Omit<Database["public"]['Tables']["orders"]['Row'], Database["public"]['Tables']["orders"]['ComputedFields']> }; Returns: boolean
@@ -340,6 +408,9 @@ isOneToOne: false
 "create_order":
 { Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: string
                            },
+"create_seasonal_order":
+{ Args: { "p_campaign_id": string,"p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: string
+                           },
 "current_profile_location":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -348,6 +419,9 @@ isOneToOne: false
                            },
 "insert_revision_items":
 { Args: { "p_items": Json,"p_revision_id": string }; Returns: undefined
+                           },
+"insert_seasonal_revision_items":
+{ Args: { "p_campaign_id": string,"p_items": Json,"p_revision_id": string }; Returns: undefined
                            },
 "reject_order":
 { Args: { "p_expected_version": number,"p_order_id": string,"p_reason"?: string }; Returns: undefined
@@ -473,7 +547,7 @@ export type CompositeTypes<
 export const Constants = {
   "graphql_public": {
           Enums: {
-            
+
           }
         },"public": {
           Enums: {
