@@ -127,9 +127,21 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store.getByText("Sem recheio", { exact: true })).toBeVisible();
   await store.getByLabel("Data de levantamento").click();
   await store.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
+  await store.keyboard.press("Escape");
   await store.getByLabel("Loja de levantamento").click();
   await store.getByRole("option").first().click();
   await expect(store.getByLabel("Hora de levantamento")).toBeEnabled();
+  await store.getByLabel("Hora de levantamento").click();
+  await store.getByRole("option").first().click();
+  await store.getByLabel("Nome do cliente").fill(`Cliente sazonal ${testInfo.project.name}`);
+  await store.getByLabel(/^Email/).fill(`sazonal-${testInfo.project.name.toLowerCase().replace(/\s+/g, "-")}@example.pt`);
+  await store.getByLabel("Telefone").fill("912345678");
+  await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
+  await store.getByLabel(/^Observação/).fill("Bem passado");
+  await store.getByRole("button", { name: "Enviar encomenda sazonal" }).click();
+  await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
+  await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
+  await expect(store.getByRole("button", { name: /Aceitar|Rejeitar/ })).toHaveCount(0);
   await store.close();
 });
 

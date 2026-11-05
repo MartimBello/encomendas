@@ -50,7 +50,7 @@ export async function createSeasonalOrderAction(payload: SeasonalOrderPayload): 
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/loja/sazonais"); revalidatePath("/cozinha/sazonais");
   await nudgeNotificationWorker();
-  return { ok: true, data: { orderId: String(data) }, message: "Encomenda sazonal enviada à cozinha." };
+  return { ok: true, data: { orderId: String(data) }, message: "Encomenda sazonal confirmada." };
 }
 
 export async function reviseOrderAction(payload: OrderPayload): Promise<ActionResult<{ orderId: string }>> {
