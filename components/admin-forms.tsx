@@ -6,10 +6,12 @@ import { toast } from "sonner";
 import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateSettingsAction } from "@/app/admin/actions";
 import type { Location, OrderingSettings } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
 
 const initial = { ok: false as const, message: "" };
 function Message({ state }: { state: { ok: boolean; message?: string } }) { return state.message ? <p className={state.ok ? "rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" : "rounded-xl bg-red-50 p-3 text-sm text-red-800"}>{state.message}</p> : null; }
@@ -22,7 +24,48 @@ export function SettingsForm({ settings }: { settings: OrderingSettings }) { con
 
 export function LocationForm() { const [state, action, pending] = useActionState(createLocationAction, initial); return <form action={action} className="grid gap-3 sm:grid-cols-3"><Input name="name" aria-label="Nome do local" placeholder="Nome do local" required /><Input name="address" aria-label="Morada" placeholder="Morada" required /><NativeSelect name="kind" defaultValue="store" aria-label="Tipo de local"><NativeSelectOption value="store">Loja</NativeSelectOption><NativeSelectOption value="kitchen">Cozinha</NativeSelectOption></NativeSelect><div className="sm:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar local</Button></div></form>; }
 
-export function WindowForm({ stores }: { stores: Location[] }) { const [state, action, pending] = useActionState(createPickupWindowAction, initial); return <form action={action} className="grid gap-3 sm:grid-cols-5"><NativeSelect name="location_id" defaultValue={stores[0]?.id} aria-label="Loja" required><NativeSelectOption value="" disabled>Escolher loja</NativeSelectOption>{stores.map((store) => <NativeSelectOption key={store.id} value={store.id}>{store.name}</NativeSelectOption>)}</NativeSelect><NativeSelect name="weekday" defaultValue="1" aria-label="Dia da semana"><NativeSelectOption value="1">Segunda</NativeSelectOption><NativeSelectOption value="2">Terça</NativeSelectOption><NativeSelectOption value="3">Quarta</NativeSelectOption><NativeSelectOption value="4">Quinta</NativeSelectOption><NativeSelectOption value="5">Sexta</NativeSelectOption><NativeSelectOption value="6">Sábado</NativeSelectOption><NativeSelectOption value="0">Domingo</NativeSelectOption></NativeSelect><Input name="opens_at" aria-label="Abertura" type="time" defaultValue="10:00" required /><Input name="closes_at" aria-label="Fecho" type="time" defaultValue="19:00" required /><Input name="slot_minutes" aria-label="Duração do intervalo" type="number" defaultValue="30" min="5" max="240" required /><div className="sm:col-span-5"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar horário</Button></div></form>; }
+const pickupWeekdays = [
+  { value: "1", label: "Segunda" },
+  { value: "2", label: "Terça" },
+  { value: "3", label: "Quarta" },
+  { value: "4", label: "Quinta" },
+  { value: "5", label: "Sexta" },
+  { value: "6", label: "Sábado" },
+  { value: "0", label: "Domingo" },
+] as const;
+
+export function WindowForm({ stores }: { stores: Location[] }) {
+  const [state, action, pending] = useActionState(createPickupWindowAction, initial);
+  return <form action={action} className="grid gap-4 lg:grid-cols-3">
+    <div className="flex flex-col gap-2 lg:col-span-3">
+      <Label htmlFor="pickup-window-store">Loja</Label>
+      <NativeSelect id="pickup-window-store" name="location_id" defaultValue={stores[0]?.id} required><NativeSelectOption value="" disabled>Escolher loja</NativeSelectOption>{stores.map((store) => <NativeSelectOption key={store.id} value={store.id}>{store.name}</NativeSelectOption>)}</NativeSelect>
+    </div>
+    <fieldset className="flex flex-col gap-2 lg:col-span-3">
+      <legend className="text-sm font-medium">Dias da semana</legend>
+      <p className="text-sm text-muted-foreground">Selecione um ou mais dias com este horário.</p>
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+        {pickupWeekdays.map((day) => <div key={day.value} className="flex min-h-11 items-center gap-3 rounded-xl border px-3">
+          <Checkbox id={`pickup-weekday-${day.value}`} name="weekdays" value={day.value} defaultChecked={day.value === "1"} />
+          <Label htmlFor={`pickup-weekday-${day.value}`} className="cursor-pointer">{day.label}</Label>
+        </div>)}
+      </div>
+    </fieldset>
+    <div className="flex flex-col gap-2">
+      <Label>Abertura</Label>
+      <ShadcnTimePicker name="opens_at" value="10:00" label="Abertura" />
+    </div>
+    <div className="flex flex-col gap-2">
+      <Label>Fecho</Label>
+      <ShadcnTimePicker name="closes_at" value="19:00" label="Fecho" />
+    </div>
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="pickup-slot-minutes">Intervalo entre escolhas</Label>
+      <Input id="pickup-slot-minutes" name="slot_minutes" type="number" defaultValue="30" min="5" max="240" required />
+    </div>
+    <div className="lg:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending || !stores.length}><Plus />Adicionar horários</Button></div>
+  </form>;
+}
 
 export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" placeholder="Nova categoria" required /><Button disabled={pending}><Plus />Adicionar</Button><Message state={state} /></form>; }
 

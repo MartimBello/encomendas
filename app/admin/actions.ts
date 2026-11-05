@@ -65,10 +65,12 @@ export async function toggleLocationAction(locationId: string, active: boolean):
 
 export async function createPickupWindowAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ location_id: z.uuid(), weekday: z.coerce.number().int().min(0).max(6), opens_at: z.string().regex(/^\d{2}:\d{2}$/), closes_at: z.string().regex(/^\d{2}:\d{2}$/), slot_minutes: z.coerce.number().int().min(5).max(240) }).safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, message: "Verifique os dados do horário." };
-  const supabase = await createClient(); const { error } = await supabase!.from("pickup_windows").insert(parsed.data);
-  if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/definicoes"); return { ok: true, message: "Horário adicionado." };
+  const parsed = z.object({ location_id: z.uuid(), weekdays: z.array(z.coerce.number().int().min(0).max(6)).min(1).max(7), opens_at: z.string().regex(/^\d{2}:\d{2}$/), closes_at: z.string().regex(/^\d{2}:\d{2}$/), slot_minutes: z.coerce.number().int().min(5).max(240) }).safeParse({ ...Object.fromEntries(formData), weekdays: formData.getAll("weekdays") });
+  if (!parsed.success || parsed.data.closes_at <= parsed.data.opens_at) return { ok: false, message: "Escolha uma loja, pelo menos um dia e um horário válido." };
+  const weekdays = [...new Set(parsed.data.weekdays)];
+  const rows = weekdays.map((weekday) => ({ location_id: parsed.data.location_id, weekday, opens_at: parsed.data.opens_at, closes_at: parsed.data.closes_at, slot_minutes: parsed.data.slot_minutes }));
+  const supabase = await createClient(); const { error } = await supabase!.from("pickup_windows").insert(rows);
+  if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/definicoes"); return { ok: true, message: `Horários adicionados para ${rows.length} dia${rows.length === 1 ? "" : "s"}.` };
 }
 
 export async function createCategoryAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -117,6 +119,27 @@ export async function createSeasonalCampaignAction(_previous: ActionResult, form
   revalidatePath("/admin/sazonais"); return { ok: true, message: "Campanha criada como inativa." };
 }
 
+export async function updateSeasonalCampaignAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const actor = await requireProfile(["admin"]);
+  const parsed = z.object({
+    campaign_id: z.uuid(),
+    name: z.string().trim().min(2).max(120),
+    slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    description: z.string().trim().max(1000),
+    opens_date: z.iso.date(), opens_time: z.string().regex(/^\d{2}:\d{2}$/),
+    closes_date: z.iso.date(), closes_time: z.string().regex(/^\d{2}:\d{2}$/),
+  }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Verifique o nome, identificador e período de aceitação." };
+  const opensAt = inputLocalToUtc(`${parsed.data.opens_date}T${parsed.data.opens_time}`);
+  const closesAt = inputLocalToUtc(`${parsed.data.closes_date}T${parsed.data.closes_time}`);
+  if (new Date(closesAt) <= new Date(opensAt)) return { ok: false, message: "O fim da aceitação tem de ser posterior ao início." };
+  const supabase = await createClient();
+  const { data, error } = await supabase!.from("seasonal_campaigns").update({ name: parsed.data.name, slug: parsed.data.slug, description: parsed.data.description, ordering_opens_at: opensAt, ordering_closes_at: closesAt, updated_by: actor.id }).eq("id", parsed.data.campaign_id).select("id").maybeSingle();
+  if (error || !data) return { ok: false, message: databaseError(error, "A campanha não existe ou não pôde ser atualizada.") };
+  revalidatePath("/admin/sazonais"); revalidatePath("/loja/sazonais"); revalidatePath(`/loja/sazonais/${parsed.data.campaign_id}`);
+  return { ok: true, message: "Campanha atualizada." };
+}
+
 export async function toggleSeasonalCampaignAction(campaignId: string, active: boolean): Promise<ActionResult> {
   const actor = await requireProfile(["admin"]); const supabase = await createClient();
   const { error } = await supabase!.from("seasonal_campaigns").update({ active, updated_by: actor.id }).eq("id", campaignId);
@@ -126,11 +149,21 @@ export async function toggleSeasonalCampaignAction(campaignId: string, active: b
 
 export async function createSeasonalProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ campaign_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
+  const parsed = z.object({ campaign_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   if (!parsed.success) return { ok: false, message: "Verifique os dados do artigo sazonal." };
   const supabase = await createClient(); const { error } = await supabase!.from("seasonal_products").insert(parsed.data);
   if (error) return { ok: false, message: databaseError(error) };
   revalidatePath("/admin/sazonais"); return { ok: true, message: "Artigo adicionado ao menu especial." };
+}
+
+export async function updateSeasonalProductStockAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireProfile(["admin"]);
+  const parsed = z.object({ product_id: z.uuid(), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Indique um limite positivo ou deixe o campo vazio." };
+  const supabase = await createClient(); const { data, error } = await supabase!.from("seasonal_products").update({ stock_limit: parsed.data.stock_limit }).eq("id", parsed.data.product_id).select("id").maybeSingle();
+  if (error || !data) return { ok: false, message: databaseError(error, "O artigo não existe ou não pôde ser atualizado.") };
+  revalidatePath("/admin/sazonais"); revalidatePath("/loja/sazonais");
+  return { ok: true, message: parsed.data.stock_limit === null ? "Limite de stock removido." : "Limite de stock atualizado." };
 }
 
 export async function createSeasonalPickupSlotAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {

@@ -90,6 +90,7 @@ export interface SeasonalProduct {
   unit_label: string;
   minimum_quantity: number;
   quantity_step: number;
+  stock_limit: number | null;
   requires_note: boolean;
   active: boolean;
   position: number;
@@ -110,6 +111,7 @@ export interface SeasonalPickupSlot {
 export interface OrderItem {
   id?: string;
   product_id: string | null;
+  seasonal_product_id?: string | null;
   product_name?: string;
   unit_label?: string;
   quantity: number;
