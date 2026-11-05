@@ -36,6 +36,8 @@ export function renderOrderEmail(
       ? `Motivo: ${escapeHtml(order.rejection_reason || "Sem disponibilidade")}`
       : kind === "order_cancelled"
         ? "O cancelamento já se encontra registado."
+        : kind === "order_accepted" && order.campaign
+          ? "A sua encomenda sazonal ficou confirmada automaticamente."
         : "A cozinha confirmou os dados abaixo.";
   const rows = items
     .map(

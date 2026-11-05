@@ -1,5 +1,5 @@
 begin;
-select plan(30);
+select plan(31);
 
 select has_table('public', 'seasonal_campaigns', 'seasonal campaigns table exists');
 select has_table('public', 'seasonal_products', 'seasonal products table exists');
@@ -59,6 +59,7 @@ select is((select product_id from public.order_items where revision_id = (select
 select is((select seasonal_product_id from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), '49100000-0000-4000-8000-000000000001'::uuid, 'seasonal snapshot retains the product identity for stock accounting');
 select is((select count(*)::integer from public.notification_outbox where kind = 'new_order' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 0, 'seasonal order does not queue a kitchen acceptance push');
 select is((select count(*)::integer from public.notification_outbox where kind = 'order_accepted' and channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 1, 'seasonal order queues its confirmation email');
+select is((select recipient from public.notification_outbox where kind = 'order_accepted' and channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 'sazonal@example.pt', 'seasonal confirmation email keeps its recipient');
 select is((select count(*)::integer from public.order_events where event_type = 'accepted' and metadata ->> 'automatic' = 'true' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202')), 1, 'automatic confirmation is audited');
 select is(
   public.create_seasonal_order(

@@ -96,8 +96,8 @@ begin
     values
       (result_id, 1, 'created', auth.uid(), jsonb_build_object('campaign_id', p_campaign_id)),
       (result_id, 1, 'accepted', null, jsonb_build_object('campaign_id', p_campaign_id, 'automatic', true));
-  insert into public.notification_outbox(order_id, revision_version, channel, kind)
-    values (result_id, 1, 'email', 'order_accepted');
+  insert into public.notification_outbox(order_id, revision_version, channel, kind, recipient)
+    values (result_id, 1, 'email', 'order_accepted', lower(trim(p_customer_email)));
   return result_id;
 end;
 $$;

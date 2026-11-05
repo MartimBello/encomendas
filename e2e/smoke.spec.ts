@@ -51,8 +51,24 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
 test("seasonal campaigns expose their special menu and pickup ranges", async ({ browser }, testInfo) => {
   const productName = `Produto Playwright ${testInfo.project.name}`;
   const editedProductName = `${productName} editado`;
+  const categoryName = `Categoria Playwright ${testInfo.project.name} ${Date.now()}`;
+  const editedCategoryName = `${categoryName} editada`;
   const admin = await browser.newPage();
   await login(admin, "admin@encomendas.local");
+  await admin.goto("/admin/catalogo");
+  await admin.getByLabel("Nome da nova categoria").fill(categoryName);
+  await admin.getByLabel("Ordem da nova categoria").fill("100");
+  await admin.getByRole("button", { name: "Adicionar", exact: true }).click();
+  await expect(admin.getByText("Categoria criada.")).toBeVisible();
+  const categoryRow = admin.getByRole("row").filter({ hasText: categoryName });
+  await categoryRow.getByRole("button", { name: "Editar" }).click();
+  const categoryDialog = admin.getByRole("dialog", { name: `Editar categoria · ${categoryName}` });
+  await categoryDialog.getByLabel("Nome").fill(editedCategoryName);
+  await categoryDialog.getByLabel("Ordem").fill("110");
+  await categoryDialog.getByRole("button", { name: "Guardar alterações" }).click();
+  await expect(categoryDialog.getByText("Categoria atualizada.")).toBeVisible();
+  await categoryDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(admin.getByRole("row").filter({ hasText: editedCategoryName })).toBeVisible();
   await admin.goto("/admin/sazonais");
   await expect(admin.getByRole("heading", { name: "Campanhas sazonais" })).toBeVisible();
   await expect(admin.getByLabel("Categoria")).toHaveValue("20000000-0000-4000-8000-000000000001");
