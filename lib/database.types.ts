@@ -35,6 +35,7 @@ export type Database = {
                     "active"?: boolean,"address"?: string,"created_at"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["location_type"],"name"?: string,"updated_at"?: string
                   }
                   Relationships: [
+
                   ]
                 },"notification_delivery_attempts": {
                   Row: {
@@ -98,14 +99,14 @@ isOneToOne: false
                   ]
                 },"order_items": {
                   Row: {
-                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"unit_label": string
+                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id": string | null,"unit_label": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"unit_label": string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id"?: string | null,"unit_label": string
                   }
                   Update: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"unit_label"?: string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"seasonal_product_id"?: string | null,"unit_label"?: string
                   }
                   Relationships: [
                     {
@@ -119,6 +120,12 @@ isOneToOne: false
       columns: ["revision_id"]
 isOneToOne: false
       referencedRelation: "order_revisions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "order_items_seasonal_product_id_fkey"
+      columns: ["seasonal_product_id"]
+isOneToOne: false
+      referencedRelation: "seasonal_products"
       referencedColumns: ["id"]
     }
                   ]
@@ -306,6 +313,7 @@ isOneToOne: false
                     "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description"?: string,"id"?: string,"name"?: string,"ordering_closes_at"?: string,"ordering_opens_at"?: string,"slug"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
+
                   ]
                 },"seasonal_pickup_slots": {
                   Row: {
@@ -335,14 +343,14 @@ isOneToOne: false
                   ]
                 },"seasonal_products": {
                   Row: {
-                    "active": boolean,"campaign_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"unit_label": string,"updated_at": string
+                    "active": boolean,"campaign_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"campaign_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"campaign_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "active"?: boolean,"campaign_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"campaign_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {

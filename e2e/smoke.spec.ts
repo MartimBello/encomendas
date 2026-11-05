@@ -36,6 +36,15 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
   await login(admin, "admin@encomendas.local");
   await expect(admin).toHaveURL(/\/admin/);
   await expect(admin.getByRole("heading", { name: "Administração" })).toBeVisible();
+  await admin.goto("/admin/definicoes");
+  await expect(admin.getByRole("heading", { name: "Definições" })).toBeVisible();
+  const monday = admin.getByRole("checkbox", { name: "Segunda" });
+  const tuesday = admin.getByRole("checkbox", { name: "Terça" });
+  await expect(monday).toBeChecked();
+  await tuesday.click();
+  await expect(monday).toBeChecked();
+  await expect(tuesday).toBeChecked();
+  await expect(admin.getByLabel("Abertura: hora")).toBeVisible();
   await admin.close();
 });
 
@@ -44,8 +53,21 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await login(admin, "admin@encomendas.local");
   await admin.goto("/admin/sazonais");
   await expect(admin.getByRole("heading", { name: "Campanhas sazonais" })).toBeVisible();
-  await expect(admin.getByRole("heading", { name: "Natal — demonstração local", exact: true })).toBeVisible();
+  const campaignHeading = admin.getByRole("heading", { name: "Natal — demonstração local", exact: true });
+  await expect(campaignHeading).toBeVisible();
+  await admin.getByRole("button", { name: "Editar" }).last().click();
+  const editDialog = admin.getByRole("dialog", { name: "Editar campanha" });
+  await expect(editDialog.getByLabel("Nome")).toHaveValue("Natal — demonstração local");
+  await editDialog.getByRole("button", { name: "Guardar alterações" }).click();
+  await expect(editDialog.getByText("Campanha atualizada.")).toBeVisible();
+  await editDialog.getByRole("button", { name: "Cancelar" }).click();
   await expect(admin.getByText("Peru assado", { exact: true })).toBeVisible();
+  await admin.getByRole("button", { name: "Stock" }).first().click();
+  const stockDialog = admin.getByRole("dialog", { name: /Limite de stock · Peru assado/ });
+  await stockDialog.getByLabel("Quantidade máxima").fill("100");
+  await stockDialog.getByRole("button", { name: "Guardar stock" }).click();
+  await expect(stockDialog.getByText("Limite de stock atualizado.")).toBeVisible();
+  await stockDialog.getByRole("button", { name: "Cancelar" }).click();
   await admin.getByRole("button", { name: "Selecionar lojas" }).click();
   await admin.getByRole("checkbox", { name: "Loja da Boavista" }).click();
   await admin.getByRole("checkbox", { name: "Loja de Matosinhos" }).click();
