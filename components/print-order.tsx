@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Order } from "@/lib/domain";
 import { formatDateTime } from "@/lib/dates";
-import { cn, formatQuantity } from "@/lib/utils";
+import { cn, formatProductName, formatQuantity } from "@/lib/utils";
 import { PrintControls } from "@/components/print-controls";
 
 export function PrintOrder({
@@ -72,7 +72,7 @@ export function PrintOrder({
           {revision.items?.map((item) => (
             <div key={item.id} className="flex justify-between gap-4 border-b border-dashed py-3">
               <div>
-                <p className="font-bold">{item.product_name}</p>
+                <p className="font-bold">{formatProductName(item.product_name, item.variation_name)}</p>
                 {item.item_note && <p className="mt-1 text-sm">Nota: {item.item_note}</p>}
               </div>
               <p className="shrink-0 text-lg font-black">

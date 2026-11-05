@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CalendarClock, Mail, MapPin, Phone, Printer, Store } from "lucide-react";
 import { getOrder } from "@/lib/data";
 import { formatDateTime } from "@/lib/dates";
-import { formatQuantity } from "@/lib/utils";
+import { formatProductName, formatQuantity } from "@/lib/utils";
 import { StoreOrderActions } from "@/components/order-actions";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -35,7 +35,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
         <CardHeader><CardTitle>Artigos</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {revision.items?.map((item) => <div key={item.id} className="flex justify-between gap-4 border-b pb-3 last:border-0">
-            <div><p className="font-semibold">{item.product_name}</p>{item.item_note && <p className="text-sm text-muted-foreground">{item.item_note}</p>}</div>
+            <div><p className="font-semibold">{formatProductName(item.product_name, item.variation_name)}</p>{item.item_note && <p className="text-sm text-muted-foreground">{item.item_note}</p>}</div>
             <p className="font-semibold">{formatQuantity(item.quantity)} {item.unit_label}</p>
           </div>)}
           {revision.general_notes && <div className="rounded-xl bg-muted p-4 text-sm"><strong>Observações:</strong><p className="mt-1 whitespace-pre-wrap">{revision.general_notes}</p></div>}
@@ -67,7 +67,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
               <dl className="grid gap-2 text-sm">
                 <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd>{entry.customer_name || "Dados removidos"}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Levantamento</dt><dd>{formatDateTime(entry.pickup_at)}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Artigos</dt><dd>{entry.items?.map((item) => `${formatQuantity(item.quantity)} ${item.unit_label} ${item.product_name}`).join(" · ")}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Artigos</dt><dd>{entry.items?.map((item) => `${formatQuantity(item.quantity)} ${item.unit_label} ${formatProductName(item.product_name, item.variation_name)}`).join(" · ")}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Observações</dt><dd>{entry.general_notes || "—"}</dd></div>
               </dl>
               <Button asChild variant="outline" size="sm" className="mt-4">

@@ -71,7 +71,7 @@ function emailFor(
   const rows = items
     .map(
       (item) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #ddd">${escapeHtml(item.product_name)}</td><td style="text-align:right;border-bottom:1px solid #ddd">${item.quantity} ${escapeHtml(item.unit_label)}</td></tr>`,
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #ddd">${escapeHtml(`${item.product_name}${item.variation_name ? ` · ${item.variation_name}` : ""}`)}</td><td style="text-align:right;border-bottom:1px solid #ddd">${item.quantity} ${escapeHtml(item.unit_label)}</td></tr>`,
     )
     .join("");
   return {

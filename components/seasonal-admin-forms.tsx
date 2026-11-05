@@ -3,20 +3,24 @@
 import { useActionState, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { CalendarDays, LoaderCircle, Plus, Store } from "lucide-react";
+import { CalendarDays, LoaderCircle, Pencil, Plus, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createSeasonalCampaignAction,
   createSeasonalPickupSlotAction,
   createSeasonalProductAction,
+  deleteSeasonalPickupSlotAction,
+  deleteSeasonalProductAction,
   toggleSeasonalCampaignAction,
   toggleSeasonalPickupSlotAction,
   toggleSeasonalProductAction,
   updateSeasonalCampaignAction,
-  updateSeasonalProductStockAction,
+  updateSeasonalPickupSlotAction,
+  updateSeasonalProductAction,
 } from "@/app/admin/actions";
 import { APP_TIME_ZONE } from "@/lib/dates";
-import type { Location, SeasonalCampaign, SeasonalProduct } from "@/lib/domain";
+import type { Location, SeasonalCampaign, SeasonalPickupSlot, SeasonalProduct } from "@/lib/domain";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -70,12 +74,16 @@ export function SeasonalCampaignEditForm({ campaign }: { campaign: SeasonalCampa
   </Dialog>;
 }
 
-export function SeasonalProductForm({ campaigns }: { campaigns: SeasonalCampaign[] }) {
+export function SeasonalProductForm({ campaigns, categories }: { campaigns: SeasonalCampaign[]; categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createSeasonalProductAction, initial);
   return <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
     <div className="flex flex-col gap-2">
       <Label htmlFor="season-product-campaign">Campanha</Label>
       <NativeSelect id="season-product-campaign" name="campaign_id" defaultValue={campaigns[0]?.id} required><NativeSelectOption value="" disabled>Escolher campanha</NativeSelectOption>{campaigns.map((campaign) => <NativeSelectOption key={campaign.id} value={campaign.id}>{campaign.name}</NativeSelectOption>)}</NativeSelect>
+    </div>
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="season-product-category">Categoria</Label>
+      <NativeSelect id="season-product-category" name="category_id" defaultValue={categories[0]?.id} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect>
     </div>
     <div className="flex flex-col gap-2">
       <Label htmlFor="season-product-name">Nome do artigo</Label>
@@ -105,22 +113,33 @@ export function SeasonalProductForm({ campaigns }: { campaigns: SeasonalCampaign
       <Label htmlFor="season-product-stock">Limite de stock</Label>
       <Input id="season-product-stock" name="stock_limit" type="number" min="0.001" step="0.001" placeholder="Sem limite" />
     </div>
+    <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4"><Label htmlFor="season-product-variations">Variações (opcional, uma por linha)</Label><Textarea id="season-product-variations" name="variations" placeholder={"Com recheio\nSem recheio"} /></div>
     <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id="season-requires-note" name="requires_note" /><Label htmlFor="season-requires-note">Nota obrigatória</Label></div>
-    <div className="sm:col-span-2 lg:col-span-4"><Message state={state} /><Button className="mt-2" disabled={pending || !campaigns.length}><Plus />Adicionar artigo</Button></div>
+    <div className="sm:col-span-2 lg:col-span-4"><Message state={state} /><Button className="mt-2" disabled={pending || !campaigns.length || !categories.length}><Plus />Adicionar artigo</Button></div>
   </form>;
 }
 
-export function SeasonalProductStockForm({ product }: { product: SeasonalProduct }) {
-  const [state, action, pending] = useActionState(updateSeasonalProductStockAction, initial);
+export function SeasonalProductEditForm({ product, categories }: { product: SeasonalProduct; categories: { id: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(updateSeasonalProductAction, initial);
+  const fieldId = `season-product-edit-${product.id}`;
   return <Dialog>
-    <DialogTrigger asChild><Button size="sm" variant="outline">Stock</Button></DialogTrigger>
-    <DialogContent>
-      <DialogHeader><DialogTitle>Limite de stock · {product.name}</DialogTitle><DialogDescription>O limite inclui encomendas pendentes e aceites. Rejeições e cancelamentos libertam automaticamente a quantidade.</DialogDescription></DialogHeader>
-      <form action={action} className="flex flex-col gap-4">
+    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
+    <DialogContent className="max-w-3xl">
+      <DialogHeader><DialogTitle>Editar artigo · {product.name}</DialogTitle><DialogDescription>Atualize a categoria, quantidades, stock e restantes dados do artigo.</DialogDescription></DialogHeader>
+      <form action={action} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <input type="hidden" name="product_id" value={product.id} />
-        <div className="flex flex-col gap-2"><Label htmlFor={`season-stock-${product.id}`}>Quantidade máxima</Label><Input id={`season-stock-${product.id}`} name="stock_limit" type="number" min="0.001" step="0.001" defaultValue={product.stock_limit ?? ""} placeholder="Sem limite" /><p className="text-sm text-muted-foreground">Deixe vazio para permitir stock ilimitado.</p></div>
-        <Message state={state} />
-        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar stock</Button></DialogFooter>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-category`}>Categoria</Label><NativeSelect id={`${fieldId}-category`} name="category_id" defaultValue={product.category_id ?? ""} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-description`}>Descrição</Label><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-unit`}>Unidade</Label><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-minimum`}>Quantidade mínima</Label><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-step`}>Incremento</Label><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-position`}>Posição no menu</Label><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-stock`}>Limite de stock</Label><Input id={`${fieldId}-stock`} name="stock_limit" type="number" min="0.001" step="0.001" defaultValue={product.stock_limit ?? ""} placeholder="Sem limite" /></div>
+        <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${fieldId}-variations`}>Variações (uma por linha)</Label><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
+        <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><Label htmlFor={`${fieldId}-requires-note`}>Nota obrigatória</Label></div>
+        <div className="sm:col-span-2 lg:col-span-3"><Message state={state} /></div>
+        <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;
@@ -139,6 +158,49 @@ export function SeasonalPickupSlotForm({ campaigns, stores }: { campaigns: Seaso
     <div><Label htmlFor="season-slot-minutes">Intervalo entre escolhas</Label><NativeSelect id="season-slot-minutes" name="slot_minutes" defaultValue="30" className="mt-2"><NativeSelectOption value="15">15 minutos</NativeSelectOption><NativeSelectOption value="30">30 minutos</NativeSelectOption><NativeSelectOption value="60">60 minutos</NativeSelectOption></NativeSelect></div>
     <div className="sm:col-span-2 lg:col-span-4"><Message state={state} /><Button className="mt-2" disabled={pending || !campaigns.length || !stores.length || !dates.length || !storeIds.length}><Plus />Adicionar dias e horário</Button></div>
   </form>;
+}
+
+export function SeasonalPickupSlotEditForm({ slot, stores }: { slot: SeasonalPickupSlot; stores: Location[] }) {
+  const [state, action, pending] = useActionState(updateSeasonalPickupSlotAction, initial);
+  const fieldId = `season-slot-edit-${slot.id}`;
+  return <Dialog>
+    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Editar dia de levantamento</DialogTitle><DialogDescription>Atualize a loja, data, período de abertura e intervalo entre escolhas.</DialogDescription></DialogHeader>
+      <form action={action} className="grid gap-4 sm:grid-cols-2">
+        <input type="hidden" name="slot_id" value={slot.id} />
+        <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-location`}>Loja</Label><NativeSelect id={`${fieldId}-location`} name="location_id" defaultValue={slot.location_id} required>{stores.map((store) => <NativeSelectOption key={store.id} value={store.id}>{store.name}</NativeSelectOption>)}</NativeSelect></div>
+        <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-date`}>Data</Label><Input id={`${fieldId}-date`} name="pickup_date" type="date" defaultValue={slot.pickup_date} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-opens`}>Abertura da loja</Label><Input id={`${fieldId}-opens`} name="opens_at" type="time" defaultValue={slot.opens_at.slice(0, 5)} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-closes`}>Fecho da loja</Label><Input id={`${fieldId}-closes`} name="closes_at" type="time" defaultValue={slot.closes_at.slice(0, 5)} required /></div>
+        <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-minutes`}>Intervalo entre escolhas</Label><NativeSelect id={`${fieldId}-minutes`} name="slot_minutes" defaultValue={String(slot.slot_minutes)}><NativeSelectOption value="15">15 minutos</NativeSelectOption><NativeSelectOption value="30">30 minutos</NativeSelectOption><NativeSelectOption value="60">60 minutos</NativeSelectOption></NativeSelect></div>
+        <div className="sm:col-span-2"><Message state={state} /></div>
+        <DialogFooter className="sm:col-span-2"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+export function SeasonalDeleteButton({ kind, id, name }: { kind: "product" | "slot"; id: string; name: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const product = kind === "product";
+  return <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialogTrigger asChild><Button size="sm" variant="destructive"><Trash2 data-icon="inline-start" />Remover</Button></AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Remover {product ? "artigo" : "dia de levantamento"}?</AlertDialogTitle>
+        <AlertDialogDescription>{product ? `O artigo “${name}” deixa de estar disponível no menu. As encomendas existentes mantêm o nome e a quantidade registados.` : `O horário “${name}” deixa de estar disponível para novas encomendas. As encomendas já registadas mantêm o levantamento escolhido.`}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
+        <AlertDialogAction disabled={pending} onClick={(event) => { event.preventDefault(); start(async () => {
+          const result = product ? await deleteSeasonalProductAction(id) : await deleteSeasonalPickupSlotAction(id);
+          if (result.ok) { toast.success(result.message); setOpen(false); } else toast.error(result.message);
+        }); }}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Remover definitivamente</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>;
 }
 
 function StoreMultiSelect({ stores, selected, onChange }: { stores: Location[]; selected: string[]; onChange: (ids: string[]) => void }) {

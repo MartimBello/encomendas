@@ -99,14 +99,14 @@ isOneToOne: false
                   ]
                 },"order_items": {
                   Row: {
-                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id": string | null,"unit_label": string
+                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id": string | null,"unit_label": string,"variation_name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id"?: string | null,"unit_label": string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id"?: string | null,"unit_label": string,"variation_name"?: string
                   }
                   Update: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"seasonal_product_id"?: string | null,"unit_label"?: string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"seasonal_product_id"?: string | null,"unit_label"?: string,"variation_name"?: string
                   }
                   Relationships: [
                     {
@@ -249,14 +249,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"unit_label": string,"updated_at": string
+                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"unit_label": string,"updated_at": string,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Relationships: [
                     {
@@ -343,14 +343,14 @@ isOneToOne: false
                   ]
                 },"seasonal_products": {
                   Row: {
-                    "active": boolean,"campaign_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"updated_at": string
+                    "active": boolean,"campaign_id": string,"category_id": string | null,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"updated_at": string,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"campaign_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"campaign_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"campaign_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string
+                    "active"?: boolean,"campaign_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Relationships: [
                     {
@@ -358,6 +358,12 @@ isOneToOne: false
       columns: ["campaign_id"]
 isOneToOne: false
       referencedRelation: "seasonal_campaigns"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "seasonal_products_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "product_categories"
       referencedColumns: ["id"]
     }
                   ]

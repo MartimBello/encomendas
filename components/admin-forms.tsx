@@ -1,16 +1,18 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
-import { LoaderCircle, Plus, RefreshCw, UserPlus } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateSettingsAction } from "@/app/admin/actions";
-import type { Location, OrderingSettings } from "@/lib/domain";
+import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
+import type { Location, OrderingSettings, Product } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
 
 const initial = { ok: false as const, message: "" };
@@ -69,6 +71,36 @@ export function WindowForm({ stores }: { stores: Location[] }) {
 
 export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" placeholder="Nova categoria" required /><Button disabled={pending}><Plus />Adicionar</Button><Message state={state} /></form>; }
 
-export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) { const [state, action, pending] = useActionState(createProductAction, initial); return <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><NativeSelect name="category_id" defaultValue={categories[0]?.id} aria-label="Categoria" required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect><Input name="name" aria-label="Nome do artigo" placeholder="Nome do artigo" required /><Input name="description" aria-label="Descrição" placeholder="Descrição" /><Input name="unit_label" aria-label="Unidade" placeholder="Unidade (kg, tab., dose)" required /><Input name="minimum_quantity" aria-label="Quantidade mínima" type="number" min="0.001" step="0.001" defaultValue="1" /><Input name="quantity_step" aria-label="Incremento" type="number" min="0.001" step="0.001" defaultValue="1" /><div className="flex items-center gap-2"><Switch id="requires-note" name="requires_note" /><Label htmlFor="requires-note">Observação obrigatória</Label></div><div className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar artigo</Button></div></form>; }
+export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(createProductAction, initial);
+  return <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <NativeSelect name="category_id" defaultValue={categories[0]?.id} aria-label="Categoria" required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect>
+    <Input name="name" aria-label="Nome do artigo" placeholder="Nome do artigo" required />
+    <Input name="description" aria-label="Descrição" placeholder="Descrição" />
+    <Input name="unit_label" aria-label="Unidade" placeholder="Unidade (kg, tab., dose)" required />
+    <Input name="minimum_quantity" aria-label="Quantidade mínima" type="number" min="0.001" step="0.001" defaultValue="1" />
+    <Input name="quantity_step" aria-label="Incremento" type="number" min="0.001" step="0.001" defaultValue="1" />
+    <div className="sm:col-span-2 lg:col-span-3"><Label htmlFor="product-variations">Variações (opcional, uma por linha)</Label><Textarea id="product-variations" name="variations" className="mt-2" placeholder={"Com recheio\nSem recheio"} /></div>
+    <div className="flex items-center gap-2"><Switch id="requires-note" name="requires_note" /><Label htmlFor="requires-note">Observação obrigatória</Label></div>
+    <div className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar artigo</Button></div>
+  </form>;
+}
+
+export function ProductVariationsForm({ product }: { product: Product }) {
+  const [state, action, pending] = useActionState(updateProductVariationsAction, initial);
+  const fieldId = `product-variations-${product.id}`;
+  return <Dialog>
+    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Variações</Button></DialogTrigger>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Variações · {product.name}</DialogTitle><DialogDescription>Uma opção por linha. Deixe vazio se o artigo não tiver variações.</DialogDescription></DialogHeader>
+      <form action={action} className="space-y-4">
+        <input type="hidden" name="product_id" value={product.id} />
+        <div className="space-y-2"><Label htmlFor={fieldId}>Variações</Label><Textarea id={fieldId} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
+        <Message state={state} />
+        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar variações</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
 
 export function RetryNotificationsButton() { const [pending, start] = useTransition(); return <Button variant="outline" disabled={pending} onClick={() => start(async () => { const result = await retryNotificationsAction(); if (result.ok) toast.success(result.message); else toast.error(result.message); })}>{pending ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Repetir falhadas</Button>; }

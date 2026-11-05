@@ -1,6 +1,6 @@
 import type { NotificationKind, Order, OrderItem, OrderRevision } from "@/lib/domain";
 import { formatDateTime } from "@/lib/dates";
-import { formatQuantity } from "@/lib/utils";
+import { formatProductName, formatQuantity } from "@/lib/utils";
 
 const subjects: Record<Extract<NotificationKind, `order_${string}`>, string> = {
   order_accepted: "A sua encomenda foi confirmada",
@@ -40,7 +40,7 @@ export function renderOrderEmail(
   const rows = items
     .map(
       (item) => `
-    <tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb">${escapeHtml(item.product_name || "Artigo")}</td>
+    <tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb">${escapeHtml(formatProductName(item.product_name, item.variation_name))}</td>
     <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;text-align:right">${formatQuantity(item.quantity)} ${escapeHtml(item.unit_label || "")}</td></tr>`,
     )
     .join("");

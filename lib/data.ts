@@ -35,7 +35,7 @@ export async function getOrders(options?: { status?: string; search?: string; li
 export async function getSeasonalCampaigns(includeInactive = false) {
   const supabase = await createClient();
   if (!supabase) return [] as SeasonalCampaign[];
-  let query = supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").order("ordering_opens_at", { ascending: false });
+  let query = supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*,category:product_categories(id,name,position)), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").order("ordering_opens_at", { ascending: false });
   if (!includeInactive) query = query.eq("active", true);
   const { data, error } = await query;
   if (error) throw error;
@@ -45,7 +45,7 @@ export async function getSeasonalCampaigns(includeInactive = false) {
 export async function getSeasonalCampaign(campaignId: string) {
   const supabase = await createClient();
   if (!supabase) return null;
-  const { data, error } = await supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").eq("id", campaignId).maybeSingle();
+  const { data, error } = await supabase.from("seasonal_campaigns").select("*, products:seasonal_products(*,category:product_categories(id,name,position)), pickup_slots:seasonal_pickup_slots(*,location:locations(id,name,address))").eq("id", campaignId).maybeSingle();
   if (error) throw error;
   return data as unknown as SeasonalCampaign | null;
 }
@@ -76,7 +76,7 @@ export async function getOrderFormOptions() {
   if (!supabase) return { locations: [], products: [], windows: [], settings: defaultSettings };
   const [{ data: locations }, { data: products }, { data: windows }, { data: settings }] = await Promise.all([
     supabase.from("locations").select("*").eq("kind", "store").eq("active", true).order("name"),
-    supabase.from("products").select("*, category:product_categories(name)").eq("active", true).order("position"),
+    supabase.from("products").select("*, category:product_categories(id,name,position)").eq("active", true).order("position"),
     supabase.from("pickup_windows").select("*").eq("active", true),
     supabase.from("ordering_settings").select("*").eq("id", true).single(),
   ]);
