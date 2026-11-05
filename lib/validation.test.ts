@@ -14,6 +14,7 @@ const validOrder = {
 
 describe("order validation", () => {
   it("accepts the complete order contract", () => expect(orderPayloadSchema.safeParse(validOrder).success).toBe(true));
+  it("keeps the selected product variation", () => expect(orderPayloadSchema.parse({ ...validOrder, items: [{ ...validOrder.items[0], variation: "Com recheio" }] }).items[0].variation).toBe("Com recheio"));
   it("requires a customer email and at least one item", () => expect(orderPayloadSchema.safeParse({ ...validOrder, customer_email: "bad", items: [] }).success).toBe(false));
   it("rejects non-positive quantities", () => expect(orderPayloadSchema.safeParse({ ...validOrder, items: [{ ...validOrder.items[0], quantity: 0 }] }).success).toBe(false));
 });

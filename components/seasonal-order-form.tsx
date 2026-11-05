@@ -22,6 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type SelectedItem = { quantity: number; note: string };
 
+function itemKey(productId: string, variation = "") { return `${productId}\u0000${variation}`; }
+
 export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCampaign; settings: OrderingSettings }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -30,7 +32,12 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
   const [pickupWindowId, setPickupWindowId] = useState("");
   const [pickupAt, setPickupAt] = useState("");
   const idempotencyKey = useRef<string | null>(null);
-  const products = (campaign.products ?? []).filter((product) => product.active).sort((a, b) => a.position - b.position);
+  const products = (campaign.products ?? []).filter((product) => product.active).sort((a, b) => (a.category?.position ?? Number.MAX_SAFE_INTEGER) - (b.category?.position ?? Number.MAX_SAFE_INTEGER) || a.position - b.position);
+  const productChoices = products.flatMap((product) => (product.variations.length ? product.variations : [""]).map((variation) => ({ product, variation, key: itemKey(product.id, variation) })));
+  const productGroups = [...new Map(productChoices.map((choice) => {
+    const name = choice.product.category?.name ?? "Outros";
+    return [name, { name, choices: productChoices.filter((entry) => (entry.product.category?.name ?? "Outros") === name) }];
+  })).values()];
   const slots = (campaign.pickup_slots ?? []).filter((slot) => slot.active && slot.pickup_date >= new Date().toLocaleDateString("sv-SE", { timeZone: APP_TIME_ZONE })).sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.opens_at.localeCompare(b.opens_at));
   const selectedDateKey = pickupDate ? format(pickupDate, "yyyy-MM-dd") : "";
   const availableDates = new Set(slots.map((slot) => slot.pickup_date));
@@ -38,18 +45,18 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
   const selectedWindow = slots.find((slot) => slot.id === pickupWindowId);
   const pickupTimes = selectedWindow ? buildPickupTimes(selectedWindow.pickup_date, selectedWindow.opens_at, selectedWindow.closes_at, selectedWindow.slot_minutes) : [];
 
-  function changeQuantity(productId: string, minimum: number, step: number, direction: 1 | -1) {
+  function changeQuantity(key: string, minimum: number, step: number, direction: 1 | -1) {
     setItems((current) => {
-      const existing = current[productId]?.quantity ?? 0;
+      const existing = current[key]?.quantity ?? 0;
       const quantity = direction === 1 ? (existing === 0 ? minimum : existing + step) : existing <= minimum ? 0 : Math.max(minimum, existing - step);
-      return { ...current, [productId]: { quantity: Number(quantity.toFixed(3)), note: current[productId]?.note ?? "" } };
+      return { ...current, [key]: { quantity: Number(quantity.toFixed(3)), note: current[key]?.note ?? "" } };
     });
   }
 
   function submit(formData: FormData) {
-    const selected = products.flatMap((product) => {
-      const item = items[product.id];
-      return item?.quantity > 0 ? [{ product_id: product.id, quantity: item.quantity, note: item.note }] : [];
+    const selected = productChoices.flatMap(({ product, variation, key }) => {
+      const item = items[key];
+      return item?.quantity > 0 ? [{ product_id: product.id, variation, quantity: item.quantity, note: item.note }] : [];
     });
     if (!selected.length) { toast.error("Adicione pelo menos um artigo do menu especial."); return; }
     idempotencyKey.current ??= crypto.randomUUID();
@@ -76,14 +83,18 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
       <div><Label>Hora de levantamento *</Label><input type="hidden" name="pickup_at" value={pickupAt} /><Select value={pickupAt} onValueChange={setPickupAt} disabled={!selectedWindow}><SelectTrigger aria-label="Hora de levantamento" className="mt-2"><SelectValue placeholder="Escolher hora" /></SelectTrigger><SelectContent>{pickupTimes.map((time) => <SelectItem key={time.value} value={time.value}>{time.label}</SelectItem>)}</SelectContent></Select></div>
     </CardContent></Card>
 
-    <Card><CardHeader><CardTitle>Menu especial · {campaign.name}</CardTitle></CardHeader><CardContent className="grid gap-4 lg:grid-cols-2">
-      {products.map((product) => {
-        const selected = items[product.id] ?? { quantity: 0, note: "" };
-        return <article key={product.id} className="rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold">{product.name}</h3>{product.description && <p className="mt-1 text-sm text-muted-foreground">{product.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Mínimo {formatQuantity(product.minimum_quantity)} · incrementos de {formatQuantity(product.quantity_step)} {product.unit_label}{product.stock_limit !== null ? ` · stock limitado a ${formatQuantity(product.stock_limit)}` : ""}</p></div><div className="flex shrink-0 items-center gap-2"><Button type="button" variant="outline" size="icon" aria-label={`Retirar ${product.name}`} onClick={() => changeQuantity(product.id, product.minimum_quantity, product.quantity_step, -1)}><Minus /></Button><span className="min-w-16 text-center font-semibold">{formatQuantity(selected.quantity)} {product.unit_label}</span><Button type="button" size="icon" aria-label={`Adicionar ${product.name}`} onClick={() => changeQuantity(product.id, product.minimum_quantity, product.quantity_step, 1)}><Plus /></Button></div></div>
-          {selected.quantity > 0 && <div className="mt-4"><Label htmlFor={`season-note-${product.id}`}>Observação {product.requires_note ? "*" : ""}</Label><Input id={`season-note-${product.id}`} value={selected.note} required={product.requires_note} onChange={(event) => setItems((current) => ({ ...current, [product.id]: { ...selected, note: event.target.value } }))} placeholder="Preparação, corte ou outra indicação" /></div>}
-        </article>;
-      })}
+    <Card><CardHeader><CardTitle>Menu especial · {campaign.name}</CardTitle></CardHeader><CardContent className="flex flex-col gap-6">
+      {productGroups.map((group) => <section key={group.name} className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold text-muted-foreground">{group.name}</h3>
+        <div className="grid gap-4 lg:grid-cols-2">{group.choices.map(({ product, variation, key }, choiceIndex) => {
+          const selected = items[key] ?? { quantity: 0, note: "" };
+          const choiceName = `${product.name}${variation ? ` · ${variation}` : ""}`;
+          return <article key={key} className="rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-4"><div><h4 className="font-semibold">{product.name}</h4>{variation && <p className="mt-1 font-medium text-primary">{variation}</p>}{product.description && <p className="mt-1 text-sm text-muted-foreground">{product.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Mínimo {formatQuantity(product.minimum_quantity)} · incrementos de {formatQuantity(product.quantity_step)} {product.unit_label}{product.stock_limit !== null ? ` · stock limitado a ${formatQuantity(product.stock_limit)}` : ""}</p></div><div className="flex shrink-0 items-center gap-2"><Button type="button" variant="outline" size="icon" aria-label={`Retirar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, -1)}><Minus /></Button><span className="min-w-16 text-center font-semibold">{formatQuantity(selected.quantity)} {product.unit_label}</span><Button type="button" size="icon" aria-label={`Adicionar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, 1)}><Plus /></Button></div></div>
+            {selected.quantity > 0 && <div className="mt-4"><Label htmlFor={`season-note-${product.id}-${choiceIndex}`}>Observação {product.requires_note ? "*" : ""}</Label><Input id={`season-note-${product.id}-${choiceIndex}`} value={selected.note} required={product.requires_note} onChange={(event) => setItems((current) => ({ ...current, [key]: { ...selected, note: event.target.value } }))} placeholder="Preparação, corte ou outra indicação" /></div>}
+          </article>;
+        })}</div>
+      </section>)}
       {!products.length && <p className="text-sm text-muted-foreground">Esta campanha ainda não tem artigos disponíveis.</p>}
     </CardContent></Card>
 

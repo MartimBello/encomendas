@@ -4,6 +4,7 @@ const databaseUuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 
 export const orderItemSchema = z.object({
   product_id: databaseUuid,
+  variation: z.string().trim().max(120).default(""),
   quantity: z.coerce.number().positive(),
   note: z.string().trim().max(500).default(""),
 });

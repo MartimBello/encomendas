@@ -1,6 +1,10 @@
 begin;
-select plan(34);
+select plan(36);
 truncate table public.orders cascade;
+
+update public.products
+set variations = array['Com recheio', 'Sem recheio']
+where id = '30000000-0000-4000-8000-000000000001';
 
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
 
@@ -11,7 +15,7 @@ select lives_ok(
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
-    '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb,
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""},{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
     null
   ) $$,
   'store can create a valid order'
@@ -22,6 +26,8 @@ select is((select status::text from public.orders limit 1), 'pending', 'new orde
 select is((select current_version from public.orders limit 1), 1, 'new order starts at version one');
 select is((select count(*)::integer from public.order_events where event_type = 'created'), 1, 'creation is audited');
 select is((select count(*)::integer from public.notification_outbox where kind = 'new_order'), 1, 'new order push is queued');
+select is((select count(*)::integer from public.order_items), 2, 'different variations of the same product create separate order lines');
+select is((select string_agg(variation_name, ', ' order by variation_name) from public.order_items), 'Com recheio, Sem recheio', 'regular order lines snapshot their selected variations');
 
 select is(
   public.create_order(
@@ -30,7 +36,7 @@ select is(
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
-    '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb,
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""},{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
     null
   ),
   (select id from public.orders limit 1),
@@ -71,7 +77,7 @@ select lives_ok(
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     'Sem cebola',
-    '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":2,"note":""}]'::jsonb
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2,"note":""}]'::jsonb
   ) $$,
   'origin store can revise an accepted order'
 );
@@ -119,7 +125,7 @@ select lives_ok(
     '10000000-0000-4000-8000-000000000002',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
-    '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb,
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
     null
   ) $$,
   'store can create another order for rejection'

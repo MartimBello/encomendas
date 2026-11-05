@@ -44,10 +44,17 @@ export interface Product {
   unit_label: string;
   minimum_quantity: number;
   quantity_step: number;
+  variations: string[];
   requires_note: boolean;
   active: boolean;
   position: number;
-  category?: { name: string } | null;
+  category?: ProductCategory | null;
+}
+
+export interface ProductCategory {
+  id?: string;
+  name: string;
+  position?: number;
 }
 
 export interface OrderingSettings {
@@ -85,15 +92,18 @@ export interface SeasonalCampaign {
 export interface SeasonalProduct {
   id: string;
   campaign_id: string;
+  category_id: string | null;
   name: string;
   description: string;
   unit_label: string;
   minimum_quantity: number;
   quantity_step: number;
+  variations: string[];
   stock_limit: number | null;
   requires_note: boolean;
   active: boolean;
   position: number;
+  category?: ProductCategory | null;
 }
 
 export interface SeasonalPickupSlot {
@@ -113,6 +123,7 @@ export interface OrderItem {
   product_id: string | null;
   seasonal_product_id?: string | null;
   product_name?: string;
+  variation_name?: string;
   unit_label?: string;
   quantity: number;
   item_note?: string;

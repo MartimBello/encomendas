@@ -9,6 +9,10 @@ export function formatQuantity(value: number | string) {
   return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 3 }).format(Number(value));
 }
 
+export function formatProductName(name: string | undefined, variation?: string) {
+  return `${name || "Artigo"}${variation ? ` · ${variation}` : ""}`;
+}
+
 export function initials(name: string) {
   return name
     .split(/\s+/)
