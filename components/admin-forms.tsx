@@ -1,9 +1,13 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
-import { LoaderCircle, Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
+import { useActionState, useId, useMemo, useState, useTransition } from "react";
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowDown, ArrowUp, GripVertical, LoaderCircle, Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateCategoryAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
+import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, reorderCategoriesAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateCategoryAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
 import type { Location, OrderingSettings, Product } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +22,28 @@ import { ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
 
 const initial = { ok: false as const, message: "" };
 function Message({ state }: { state: { ok: boolean; message?: string } }) { return state.message ? <p className={state.ok ? "rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" : "rounded-xl bg-red-50 p-3 text-sm text-red-800"}>{state.message}</p> : null; }
+
+function formData(values: Record<string, string | number | boolean | null | undefined>) {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) {
+    if (value === true) data.set(key, "on");
+    else if (value !== false && value !== null && value !== undefined) data.set(key, String(value));
+  }
+  return data;
+}
+
+function showUndoToast(message: string | undefined, undo: () => Promise<{ ok: boolean; message?: string }>) {
+  toast.success(message ?? "Alteração guardada.", {
+    duration: 8_000,
+    action: {
+      label: "Desfazer",
+      onClick: () => void undo().then((result) => {
+        if (result.ok) toast.success("Alteração desfeita.");
+        else toast.error(result.message ?? "Não foi possível desfazer a alteração.");
+      }).catch(() => toast.error("Não foi possível desfazer a alteração.")),
+    },
+  });
+}
 
 export function InviteUserForm({ locations }: { locations: Location[] }) { const [state, action, pending] = useActionState(inviteUserAction, initial); return <form action={action} className="grid gap-4 md:grid-cols-2"><div><Label htmlFor="invite-name">Nome</Label><Input id="invite-name" name="full_name" required /></div><div><Label htmlFor="invite-email">Email</Label><Input id="invite-email" name="email" type="email" required /></div><div><Label htmlFor="invite-role">Função</Label><NativeSelect id="invite-role" name="role" defaultValue="admin" className="mt-2"><NativeSelectOption value="store">Loja</NativeSelectOption><NativeSelectOption value="kitchen">Cozinha</NativeSelectOption><NativeSelectOption value="admin">Administração</NativeSelectOption></NativeSelect></div><div><Label htmlFor="invite-location">Local</Label><NativeSelect id="invite-location" name="location_id" defaultValue="admin" className="mt-2"><NativeSelectOption value="admin">Sem local (admin)</NativeSelectOption>{locations.map((location) => <NativeSelectOption key={location.id} value={location.id}>{location.name} · {location.kind === "kitchen" ? "cozinha" : "loja"}</NativeSelectOption>)}</NativeSelect></div><div className="md:col-span-2"><Message state={state} /><Button className="mt-3" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : <UserPlus />}Enviar convite</Button></div></form>; }
 
@@ -70,28 +96,92 @@ export function WindowForm({ stores }: { stores: Location[] }) {
   </form>;
 }
 
-export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" aria-label="Nome da nova categoria" placeholder="Nova categoria" required /><Input name="position" aria-label="Ordem da nova categoria" type="number" min="0" max="10000" defaultValue="0" className="sm:w-32" required /><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar</Button><Message state={state} /></form>; }
+export function CategoryForm() { const [state, action, pending] = useActionState(createCategoryAction, initial); return <form action={action} className="flex flex-col gap-3 sm:flex-row"><Input name="name" aria-label="Nome da nova categoria" placeholder="Nova categoria" required /><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar</Button><Message state={state} /></form>; }
 
-function CategoryEditForm({ category }: { category: { id: string; name: string; position: number } }) {
-  const [state, action, pending] = useActionState(updateCategoryAction, initial);
+type Category = { id: string; name: string; position: number };
+
+function CategoryEditForm({ category }: { category: Category }) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
   const fieldId = `category-${category.id}`;
-  return <Dialog>
+  const submit = (data: FormData) => start(async () => {
+    setError("");
+    const result = await updateCategoryAction(initial, data);
+    if (!result.ok) { setError(result.message); return; }
+    setOpen(false);
+    showUndoToast(result.message, () => updateCategoryAction(initial, formData({ category_id: category.id, name: category.name })));
+  });
+  return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
     <DialogContent>
       <DialogHeader><DialogTitle>Editar categoria · {category.name}</DialogTitle><DialogDescription>Atualize o nome e a ordem em que a categoria aparece nos formulários.</DialogDescription></DialogHeader>
-      <form action={action} className="flex flex-col gap-4">
+      <form action={submit} className="flex flex-col gap-4">
         <input type="hidden" name="category_id" value={category.id} />
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={category.name} required /></div>
-        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-position`}>Ordem</Label><Input id={`${fieldId}-position`} name="position" type="number" min="0" max="10000" defaultValue={category.position} required /></div>
-        <Message state={state} />
+        <Message state={{ ok: false, message: error }} />
         <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;
 }
 
-export function CategoryTable({ categories }: { categories: { id: string; name: string; position: number }[] }) {
-  return <Table><TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead>Ordem</TableHead><TableHead /></TableRow></TableHeader><TableBody>{categories.map((category) => <TableRow key={category.id}><TableCell className="font-medium">{category.name}</TableCell><TableCell>{category.position}</TableCell><TableCell className="text-right"><CategoryEditForm category={category} /></TableCell></TableRow>)}</TableBody></Table>;
+function SortableCategoryRow({ category, disabled, first, last, onMove }: { category: Category; disabled: boolean; first: boolean; last: boolean; onMove: (direction: -1 | 1) => void }) {
+  const { attributes, listeners, isDragging, setNodeRef, transform, transition } = useSortable({ id: category.id, disabled });
+  return <TableRow ref={setNodeRef} data-dragging={isDragging} className="data-[dragging=true]:opacity-70" style={{ transform: CSS.Transform.toString(transform), transition }}>
+    <TableCell>
+      <div className="flex items-center gap-1">
+        <Button type="button" variant="ghost" size="icon" disabled={disabled} aria-label={`Reordenar ${category.name}`} {...attributes} {...listeners}><GripVertical /><span className="sr-only">Arraste para reordenar</span></Button>
+        <Button type="button" variant="ghost" size="icon" disabled={disabled || first} aria-label={`Mover ${category.name} para cima`} onClick={() => onMove(-1)}><ArrowUp /></Button>
+        <Button type="button" variant="ghost" size="icon" disabled={disabled || last} aria-label={`Mover ${category.name} para baixo`} onClick={() => onMove(1)}><ArrowDown /></Button>
+      </div>
+    </TableCell>
+    <TableCell className="font-medium">{category.name}</TableCell>
+    <TableCell className="text-right"><CategoryEditForm category={category} /></TableCell>
+  </TableRow>;
+}
+
+export function CategoryTable({ categories }: { categories: Category[] }) {
+  const [orderedIds, setOrderedIds] = useState<string[] | null>(null);
+  const [pending, start] = useTransition();
+  const contextId = useId();
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const itemIds = useMemo(() => {
+    const available = new Set(categories.map((category) => category.id));
+    const preserved = (orderedIds ?? []).filter((id) => available.has(id));
+    return [...preserved, ...categories.map((category) => category.id).filter((id) => !preserved.includes(id))];
+  }, [categories, orderedIds]);
+  const items = itemIds.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => Boolean(category));
+
+  function saveOrder(next: string[]) {
+    const previous = itemIds;
+    setOrderedIds(next);
+    start(async () => {
+      const result = await reorderCategoriesAction(next);
+      if (!result.ok) { setOrderedIds(previous); toast.error(result.message); return; }
+      showUndoToast(result.message, async () => {
+        const undo = await reorderCategoriesAction(previous);
+        if (undo.ok) setOrderedIds(previous);
+        return undo;
+      });
+    });
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    saveOrder(arrayMove(itemIds, itemIds.indexOf(String(active.id)), itemIds.indexOf(String(over.id))));
+  }
+
+  return <div className="flex flex-col gap-2">
+    <p className="text-sm text-muted-foreground">Arraste as linhas para definir a ordem apresentada nos formulários.</p>
+    <DndContext id={contextId} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
+      <Table><TableHeader><TableRow><TableHead className="w-36"><span className="sr-only">Reordenar</span></TableHead><TableHead>Categoria</TableHead><TableHead /></TableRow></TableHeader><TableBody><SortableContext items={itemIds} strategy={verticalListSortingStrategy}>{items.map((category, index) => <SortableCategoryRow key={category.id} category={category} disabled={pending} first={index === 0} last={index === items.length - 1} onMove={(direction) => saveOrder(arrayMove(itemIds, index, index + direction))} />)}</SortableContext></TableBody></Table>
+    </DndContext>
+  </div>;
 }
 
 export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) {
@@ -110,16 +200,25 @@ export function ProductForm({ categories }: { categories: { id: string; name: st
 }
 
 export function ProductVariationsForm({ product }: { product: Product }) {
-  const [state, action, pending] = useActionState(updateProductVariationsAction, initial);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
   const fieldId = `product-variations-${product.id}`;
-  return <Dialog>
+  const submit = (data: FormData) => start(async () => {
+    setError("");
+    const result = await updateProductVariationsAction(initial, data);
+    if (!result.ok) { setError(result.message); return; }
+    setOpen(false);
+    showUndoToast(result.message, () => updateProductVariationsAction(initial, formData({ product_id: product.id, variations: product.variations.join("\n") })));
+  });
+  return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Variações</Button></DialogTrigger>
     <DialogContent>
       <DialogHeader><DialogTitle>Variações · {product.name}</DialogTitle><DialogDescription>Uma opção por linha. Deixe vazio se o artigo não tiver variações.</DialogDescription></DialogHeader>
-      <form action={action} className="space-y-4">
+      <form action={submit} className="space-y-4">
         <input type="hidden" name="product_id" value={product.id} />
         <div className="space-y-2"><Label htmlFor={fieldId}>Variações</Label><Textarea id={fieldId} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
-        <Message state={state} />
+        <Message state={{ ok: false, message: error }} />
         <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar variações</Button></DialogFooter>
       </form>
     </DialogContent>

@@ -5,6 +5,17 @@ const remoteDevelopmentHosts = (process.env.NEXT_DEV_ALLOWED_HOSTS || "")
   .map((host) => host.trim())
   .filter(Boolean);
 
+function configuredSupabaseSources() {
+  try {
+    const origin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321");
+    const websocketOrigin = new URL(origin);
+    websocketOrigin.protocol = origin.protocol === "https:" ? "wss:" : "ws:";
+    return `${origin.origin} ${websocketOrigin.origin}`;
+  } catch {
+    return "http://127.0.0.1:54321 ws://127.0.0.1:54321";
+  }
+}
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", ...remoteDevelopmentHosts],
   async headers() {
@@ -16,7 +27,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.resend.com http://127.0.0.1:54321 ws://127.0.0.1:54321",
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.resend.com ${configuredSupabaseSources()}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

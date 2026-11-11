@@ -80,24 +80,59 @@ export async function createPickupWindowAction(_previous: ActionResult, formData
 
 export async function createCategoryAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ name: z.string().trim().min(2).max(120), position: z.coerce.number().int().min(0).max(10_000) }).safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, message: "Indique o nome e a ordem da categoria." };
-  const supabase = await createClient(); const { error } = await supabase!.from("product_categories").insert(parsed.data); if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/catalogo"); return { ok: true, message: "Categoria criada." };
+  const parsed = z.object({ name: z.string().trim().min(2).max(120) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Indique o nome da categoria." };
+  const supabase = await createClient();
+  const { data: lastCategory, error: orderError } = await supabase!.from("product_categories").select("position").order("position", { ascending: false }).limit(1).maybeSingle();
+  if (orderError) return { ok: false, message: databaseError(orderError) };
+  const { error } = await supabase!.from("product_categories").insert({ name: parsed.data.name, position: (lastCategory?.position ?? 0) + 10 });
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidateCategoryRoutes();
+  return { ok: true, message: "Categoria criada." };
 }
 
 export async function updateCategoryAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2).max(120), position: z.coerce.number().int().min(0).max(10_000) }).safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, message: "Indique o nome e a ordem da categoria." };
+  const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2).max(120) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Indique o nome da categoria." };
   const { category_id, ...updates } = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase!.from("product_categories").update(updates).eq("id", category_id).select("id").maybeSingle();
   if (error || !data) return { ok: false, message: databaseError(error, "A categoria não existe ou não pôde ser atualizada.") };
+  revalidateCategoryRoutes();
+  return { ok: true, message: "Categoria atualizada." };
+}
+
+export async function reorderCategoriesAction(categoryIds: string[]): Promise<ActionResult> {
+  await requireProfile(["admin"]);
+  const parsed = z.array(z.uuid()).min(1).max(100).refine((ids) => new Set(ids).size === ids.length).safeParse(categoryIds);
+  if (!parsed.success) return { ok: false, message: "A ordem das categorias é inválida." };
+
+  const supabase = await createClient();
+  const { data: categories, error: readError } = await supabase!.from("product_categories").select("id,position");
+  if (readError) return { ok: false, message: databaseError(readError) };
+  const existingIds = new Set((categories ?? []).map((category) => category.id));
+  if (existingIds.size !== parsed.data.length || parsed.data.some((id) => !existingIds.has(id))) {
+    return { ok: false, message: "Atualize a página antes de reordenar as categorias." };
+  }
+
+  const previousPositions = new Map((categories ?? []).map((category) => [category.id, category.position]));
+  const results = await Promise.all(parsed.data.map((id, index) => supabase!.from("product_categories").update({ position: (index + 1) * 10 }).eq("id", id)));
+  const failed = results.find((result) => result.error)?.error;
+  if (failed) {
+    await Promise.all([...previousPositions].map(([id, position]) => supabase!.from("product_categories").update({ position }).eq("id", id)));
+    return { ok: false, message: databaseError(failed, "Não foi possível guardar a ordem das categorias.") };
+  }
+
+  revalidateCategoryRoutes();
+  return { ok: true, message: "Ordem das categorias atualizada." };
+}
+
+function revalidateCategoryRoutes() {
   revalidatePath("/admin/catalogo");
   revalidatePath("/admin/sazonais");
   revalidatePath("/loja/encomendas/nova");
   revalidatePath("/loja/sazonais/[campaignId]", "page");
-  return { ok: true, message: "Categoria atualizada." };
 }
 
 export async function createProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -200,7 +235,7 @@ export async function createSeasonalProductAction(_previous: ActionResult, formD
 
 export async function updateSeasonalProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ product_id: z.uuid(), category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
+  const parsed = z.object({ product_id: z.uuid(), category_id: z.preprocess((value) => value === "" ? null : value, z.uuid().nullable()), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
   if (!parsed.success || !variations.success) return { ok: false, message: "Verifique os dados do artigo sazonal e indique no máximo 20 variações." };
   const { product_id: productId, ...updates } = parsed.data;

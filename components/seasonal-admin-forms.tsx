@@ -39,6 +39,28 @@ function Message({ state }: { state: { ok: boolean; message?: string } }) {
   return state.message ? <p className={state.ok ? "rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" : "rounded-xl bg-red-50 p-3 text-sm text-red-800"}>{state.message}</p> : null;
 }
 
+function formData(values: Record<string, string | number | boolean | null | undefined>) {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) {
+    if (value === true) data.set(key, "on");
+    else if (value !== false && value !== null && value !== undefined) data.set(key, String(value));
+  }
+  return data;
+}
+
+function showUndoToast(message: string | undefined, undo: () => Promise<{ ok: boolean; message?: string }>) {
+  toast.success(message ?? "Alteração guardada.", {
+    duration: 8_000,
+    action: {
+      label: "Desfazer",
+      onClick: () => void undo().then((result) => {
+        if (result.ok) toast.success("Alteração desfeita.");
+        else toast.error(result.message ?? "Não foi possível desfazer a alteração.");
+      }).catch(() => toast.error("Não foi possível desfazer a alteração.")),
+    },
+  });
+}
+
 export function SeasonalCampaignForm() {
   const [state, action, pending] = useActionState(createSeasonalCampaignAction, initial);
   return <form action={action} className="grid gap-4 md:grid-cols-2">
@@ -52,22 +74,40 @@ export function SeasonalCampaignForm() {
 }
 
 export function SeasonalCampaignEditForm({ campaign }: { campaign: SeasonalCampaign }) {
-  const [state, action, pending] = useActionState(updateSeasonalCampaignAction, initial);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
   const opensAt = toZonedTime(campaign.ordering_opens_at, APP_TIME_ZONE);
   const closesAt = toZonedTime(campaign.ordering_closes_at, APP_TIME_ZONE);
   const fieldId = `season-edit-${campaign.id}`;
-  return <Dialog>
+  const submit = (data: FormData) => start(async () => {
+    setError("");
+    const result = await updateSeasonalCampaignAction(initial, data);
+    if (!result.ok) { setError(result.message); return; }
+    setOpen(false);
+    showUndoToast(result.message, () => updateSeasonalCampaignAction(initial, formData({
+      campaign_id: campaign.id,
+      name: campaign.name,
+      slug: campaign.slug,
+      description: campaign.description,
+      opens_date: format(opensAt, "yyyy-MM-dd"),
+      opens_time: format(opensAt, "HH:mm"),
+      closes_date: format(closesAt, "yyyy-MM-dd"),
+      closes_time: format(closesAt, "HH:mm"),
+    })));
+  });
+  return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button size="sm" variant="outline">Editar</Button></DialogTrigger>
     <DialogContent className="max-w-2xl">
       <DialogHeader><DialogTitle>Editar campanha</DialogTitle><DialogDescription>Atualize o nome, descrição e período de aceitação da campanha.</DialogDescription></DialogHeader>
-      <form action={action} className="grid gap-4 md:grid-cols-2">
+      <form action={submit} className="grid gap-4 md:grid-cols-2">
         <input type="hidden" name="campaign_id" value={campaign.id} />
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={campaign.name} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-slug`}>Identificador</Label><Input id={`${fieldId}-slug`} name="slug" defaultValue={campaign.slug} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required /></div>
         <div className="flex flex-col gap-2 md:col-span-2"><Label htmlFor={`${fieldId}-description`}>Descrição para as lojas</Label><Textarea id={`${fieldId}-description`} name="description" defaultValue={campaign.description} /></div>
         <fieldset className="rounded-xl border p-4"><legend className="px-1 text-sm font-medium">Início da aceitação</legend><ShadcnDateTimePicker dateName="opens_date" timeName="opens_time" label="Início da aceitação" defaultDate={opensAt} defaultTime={format(opensAt, "HH:mm")} /></fieldset>
         <fieldset className="rounded-xl border p-4"><legend className="px-1 text-sm font-medium">Fim da aceitação</legend><ShadcnDateTimePicker dateName="closes_date" timeName="closes_time" label="Fim da aceitação" defaultDate={closesAt} defaultTime={format(closesAt, "HH:mm")} /></fieldset>
-        <div className="md:col-span-2"><Message state={state} /></div>
+        <div className="md:col-span-2"><Message state={{ ok: false, message: error }} /></div>
         <DialogFooter className="md:col-span-2"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>
       </form>
     </DialogContent>
@@ -120,13 +160,34 @@ export function SeasonalProductForm({ campaigns, categories }: { campaigns: Seas
 }
 
 export function SeasonalProductEditForm({ product, categories }: { product: SeasonalProduct; categories: { id: string; name: string }[] }) {
-  const [state, action, pending] = useActionState(updateSeasonalProductAction, initial);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
   const fieldId = `season-product-edit-${product.id}`;
-  return <Dialog>
+  const submit = (data: FormData) => start(async () => {
+    setError("");
+    const result = await updateSeasonalProductAction(initial, data);
+    if (!result.ok) { setError(result.message); return; }
+    setOpen(false);
+    showUndoToast(result.message, () => updateSeasonalProductAction(initial, formData({
+      product_id: product.id,
+      category_id: product.category_id ?? "",
+      name: product.name,
+      description: product.description,
+      unit_label: product.unit_label,
+      minimum_quantity: product.minimum_quantity,
+      quantity_step: product.quantity_step,
+      position: product.position,
+      stock_limit: product.stock_limit ?? "",
+      variations: product.variations.join("\n"),
+      requires_note: product.requires_note,
+    })));
+  });
+  return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
     <DialogContent className="max-w-3xl">
       <DialogHeader><DialogTitle>Editar artigo · {product.name}</DialogTitle><DialogDescription>Atualize a categoria, quantidades, stock e restantes dados do artigo.</DialogDescription></DialogHeader>
-      <form action={action} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <form action={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <input type="hidden" name="product_id" value={product.id} />
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-category`}>Categoria</Label><NativeSelect id={`${fieldId}-category`} name="category_id" defaultValue={product.category_id ?? ""} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></div>
@@ -138,7 +199,7 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-stock`}>Limite de stock</Label><Input id={`${fieldId}-stock`} name="stock_limit" type="number" min="0.001" step="0.001" defaultValue={product.stock_limit ?? ""} placeholder="Sem limite" /></div>
         <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${fieldId}-variations`}>Variações (uma por linha)</Label><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
         <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><Label htmlFor={`${fieldId}-requires-note`}>Nota obrigatória</Label></div>
-        <div className="sm:col-span-2 lg:col-span-3"><Message state={state} /></div>
+        <div className="sm:col-span-2 lg:col-span-3"><Message state={{ ok: false, message: error }} /></div>
         <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
       </form>
     </DialogContent>
@@ -161,20 +222,36 @@ export function SeasonalPickupSlotForm({ campaigns, stores }: { campaigns: Seaso
 }
 
 export function SeasonalPickupSlotEditForm({ slot, stores }: { slot: SeasonalPickupSlot; stores: Location[] }) {
-  const [state, action, pending] = useActionState(updateSeasonalPickupSlotAction, initial);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
   const fieldId = `season-slot-edit-${slot.id}`;
-  return <Dialog>
+  const submit = (data: FormData) => start(async () => {
+    setError("");
+    const result = await updateSeasonalPickupSlotAction(initial, data);
+    if (!result.ok) { setError(result.message); return; }
+    setOpen(false);
+    showUndoToast(result.message, () => updateSeasonalPickupSlotAction(initial, formData({
+      slot_id: slot.id,
+      location_id: slot.location_id,
+      pickup_date: slot.pickup_date,
+      opens_at: slot.opens_at.slice(0, 5),
+      closes_at: slot.closes_at.slice(0, 5),
+      slot_minutes: slot.slot_minutes,
+    })));
+  });
+  return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
     <DialogContent>
       <DialogHeader><DialogTitle>Editar dia de levantamento</DialogTitle><DialogDescription>Atualize a loja, data, período de abertura e intervalo entre escolhas.</DialogDescription></DialogHeader>
-      <form action={action} className="grid gap-4 sm:grid-cols-2">
+      <form action={submit} className="grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="slot_id" value={slot.id} />
         <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-location`}>Loja</Label><NativeSelect id={`${fieldId}-location`} name="location_id" defaultValue={slot.location_id} required>{stores.map((store) => <NativeSelectOption key={store.id} value={store.id}>{store.name}</NativeSelectOption>)}</NativeSelect></div>
         <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-date`}>Data</Label><Input id={`${fieldId}-date`} name="pickup_date" type="date" defaultValue={slot.pickup_date} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-opens`}>Abertura da loja</Label><Input id={`${fieldId}-opens`} name="opens_at" type="time" defaultValue={slot.opens_at.slice(0, 5)} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-closes`}>Fecho da loja</Label><Input id={`${fieldId}-closes`} name="closes_at" type="time" defaultValue={slot.closes_at.slice(0, 5)} required /></div>
         <div className="flex flex-col gap-2 sm:col-span-2"><Label htmlFor={`${fieldId}-minutes`}>Intervalo entre escolhas</Label><NativeSelect id={`${fieldId}-minutes`} name="slot_minutes" defaultValue={String(slot.slot_minutes)}><NativeSelectOption value="15">15 minutos</NativeSelectOption><NativeSelectOption value="30">30 minutos</NativeSelectOption><NativeSelectOption value="60">60 minutos</NativeSelectOption></NativeSelect></div>
-        <div className="sm:col-span-2"><Message state={state} /></div>
+        <div className="sm:col-span-2"><Message state={{ ok: false, message: error }} /></div>
         <DialogFooter className="sm:col-span-2"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
       </form>
     </DialogContent>
