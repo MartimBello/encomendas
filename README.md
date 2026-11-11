@@ -67,6 +67,8 @@ npm run test:e2e
 npm run supabase:stop
 ```
 
+Nos workspaces locais do Conductor, `test:e2e` cria e remove automaticamente uma stack Supabase isolada nas portas atribuídas ao workspace. Fora do Conductor, inicie primeiro a stack normal com `npm run supabase:start`.
+
 `supabase:reset` apaga apenas a base de dados Docker local, reaplica todas as migrations e volta a carregar o seed.
 
 ## Produção: Vercel + Supabase Cloud
