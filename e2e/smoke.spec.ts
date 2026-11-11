@@ -38,6 +38,9 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
   await expect(admin.getByRole("heading", { name: "Administração" })).toBeVisible();
   await admin.goto("/admin/definicoes");
   await expect(admin.getByRole("heading", { name: "Definições" })).toBeVisible();
+  await expect(admin.getByRole("tab", { name: "Regras de encomenda" })).toHaveAttribute("aria-selected", "true");
+  await admin.getByRole("tab", { name: "Locais", exact: true }).click();
+  await expect(admin.getByRole("heading", { name: "Locais e horários" })).toBeVisible();
   const monday = admin.getByRole("checkbox", { name: "Segunda" });
   const tuesday = admin.getByRole("checkbox", { name: "Terça" });
   await expect(monday).toBeChecked();
@@ -45,6 +48,8 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
   await expect(monday).toBeChecked();
   await expect(tuesday).toBeChecked();
   await expect(admin.getByLabel("Abertura: hora")).toBeVisible();
+  await admin.getByRole("tab", { name: "Retenção de dados" }).click();
+  await expect(admin.getByLabel("Retenção de dados (meses)")).toHaveValue("24");
   await admin.close();
 });
 
@@ -56,6 +61,19 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   const admin = await browser.newPage();
   await login(admin, "admin@encomendas.local");
   await admin.goto("/admin/catalogo");
+  const catalogProductRow = admin.getByRole("row").filter({ hasText: "Bacalhau com natas" });
+  await catalogProductRow.getByRole("button", { name: "Editar" }).click();
+  const catalogProductDialog = admin.getByRole("dialog", { name: "Editar artigo · Bacalhau com natas" });
+  await expect(catalogProductDialog.getByLabel("Categoria", { exact: true })).toHaveValue("20000000-0000-4000-8000-000000000001");
+  await expect(catalogProductDialog.getByLabel("Descrição")).toHaveValue("Tabuleiro pronto a servir");
+  await catalogProductDialog.getByLabel("Nome").fill("Bacalhau com natas editado");
+  await catalogProductDialog.getByRole("button", { name: "Guardar alterações" }).click();
+  await expect(catalogProductDialog).toBeHidden();
+  await expect(admin.getByText("Artigo atualizado.")).toBeVisible();
+  await expect(admin.getByRole("row").filter({ hasText: "Bacalhau com natas editado" })).toBeVisible();
+  await admin.getByRole("button", { name: "Desfazer" }).click();
+  await expect(admin.getByText("Alteração desfeita.")).toBeVisible();
+  await expect(catalogProductRow).toBeVisible();
   await admin.getByLabel("Nome da nova categoria").fill(categoryName);
   await admin.getByRole("button", { name: "Adicionar", exact: true }).click();
   await expect(admin.getByText("Categoria criada.")).toBeVisible();
@@ -76,11 +94,17 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   expect(categoryCells.indexOf(categoryName)).toBeLessThan(categoryCells.indexOf("Sobremesas"));
   await admin.goto("/admin/sazonais");
   await expect(admin.getByRole("heading", { name: "Campanhas sazonais" })).toBeVisible();
+  await admin.getByRole("button", { name: "Nova campanha" }).click();
+  const createCampaignDialog = admin.getByRole("dialog", { name: "Nova campanha sazonal" });
+  await expect(createCampaignDialog).toBeVisible();
+  await createCampaignDialog.getByRole("button", { name: "Cancelar" }).click();
+  const campaignRow = admin.getByRole("row").filter({ hasText: "Natal — demonstração local" });
+  await campaignRow.getByRole("link", { name: "Editar" }).click();
+  await expect(admin).toHaveURL(/\/admin\/sazonais\/40000000-0000-4000-8000-000000000001$/);
+  await expect(admin.getByRole("heading", { name: "Natal — demonstração local", exact: true })).toBeVisible();
   await expect(admin.getByLabel("Categoria")).toHaveValue("20000000-0000-4000-8000-000000000001");
   const categoryOptions = await admin.getByLabel("Categoria").locator("option").allTextContents();
   expect(categoryOptions.indexOf(categoryName)).toBeLessThan(categoryOptions.indexOf("Sobremesas"));
-  const campaignHeading = admin.getByRole("heading", { name: "Natal — demonstração local", exact: true });
-  await expect(campaignHeading).toBeVisible();
   await admin.getByRole("button", { name: "Editar" }).first().click();
   const editDialog = admin.getByRole("dialog", { name: "Editar campanha" });
   await expect(editDialog.getByLabel("Nome")).toHaveValue("Natal — demonstração local");
@@ -93,7 +117,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await admin.getByLabel("Unidade").fill("un.");
   await admin.getByRole("button", { name: "Adicionar artigo" }).click();
   await expect(admin.getByText("Artigo adicionado ao menu especial.")).toBeVisible();
-  const productRow = admin.getByRole("article", { name: `Artigo ${productName}` });
+  const productRow = admin.getByRole("row", { name: new RegExp(`Artigo ${productName}`) });
   await productRow.getByRole("button", { name: "Editar" }).click();
   const productDialog = admin.getByRole("dialog", { name: `Editar artigo · ${productName}` });
   await productDialog.getByLabel("Nome").fill(editedProductName);
@@ -101,7 +125,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await productDialog.getByRole("button", { name: "Guardar alterações" }).click();
   await expect(productDialog).toBeHidden();
   await expect(admin.getByText("Artigo atualizado.")).toBeVisible();
-  const editedProductRow = admin.getByRole("article", { name: `Artigo ${editedProductName}` });
+  const editedProductRow = admin.getByRole("row", { name: new RegExp(`Artigo ${editedProductName}`) });
   await editedProductRow.getByRole("button", { name: "Remover" }).click();
   const productDeleteDialog = admin.getByRole("alertdialog", { name: "Remover artigo?" });
   await productDeleteDialog.getByRole("button", { name: "Remover definitivamente" }).click();
@@ -121,7 +145,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await admin.getByRole("button", { name: "Adicionar dias e horário" }).click();
   await expect(admin.getByText("Dia e hora de levantamento adicionados.")).toBeVisible();
   const [pickupYear, pickupMonth, pickupDateNumber] = pickupDate!.split("-");
-  const slotRow = admin.getByRole("article", { name: `Levantamento ${pickupDateNumber}/${pickupMonth}/${pickupYear} Loja da Boavista` });
+  const slotRow = admin.getByRole("row", { name: new RegExp(`Levantamento ${pickupDateNumber}/${pickupMonth}/${pickupYear} Loja da Boavista`) });
   await slotRow.getByRole("button", { name: "Editar" }).click();
   const slotDialog = admin.getByRole("dialog", { name: "Editar dia de levantamento" });
   await slotDialog.getByLabel("Intervalo entre escolhas").selectOption("60");

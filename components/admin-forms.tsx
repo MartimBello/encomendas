@@ -7,11 +7,12 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, LoaderCircle, Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, reorderCategoriesAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateCategoryAction, updateProductVariationsAction, updateSettingsAction } from "@/app/admin/actions";
+import { createCategoryAction, createLocationAction, createPickupWindowAction, createProductAction, inviteUserAction, reorderCategoriesAction, retryNotificationsAction, toggleLocationAction, toggleProductAction, toggleUserAction, updateCategoryAction, updateOrderingRulesAction, updateProductAction, updateRetentionSettingsAction } from "@/app/admin/actions";
 import type { Location, OrderingSettings, Product } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -49,7 +50,28 @@ export function InviteUserForm({ locations }: { locations: Location[] }) { const
 
 export function ToggleButton({ kind, id, active }: { kind: "user" | "location" | "product"; id: string; active: boolean }) { const [pending, start] = useTransition(); return <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => { const result = kind === "user" ? await toggleUserAction(id, !active) : kind === "location" ? await toggleLocationAction(id, !active) : await toggleProductAction(id, !active); if (result.ok) toast.success(result.message); else toast.error(result.message); })}>{pending && <LoaderCircle className="animate-spin" />}{active ? "Desativar" : "Ativar"}</Button>; }
 
-export function SettingsForm({ settings }: { settings: OrderingSettings }) { const [state, action, pending] = useActionState(updateSettingsAction, initial); return <form action={action} className="grid gap-4 sm:grid-cols-2"><div className="flex items-center gap-3 rounded-xl border p-4"><Switch id="phone-required" name="phone_required" defaultChecked={settings.phone_required} /><Label htmlFor="phone-required" className="font-medium">Telefone obrigatório</Label></div><div className="flex items-center gap-3 rounded-xl border p-4"><Switch id="notes-required" name="general_notes_required" defaultChecked={settings.general_notes_required} /><Label htmlFor="notes-required" className="font-medium">Observações obrigatórias</Label></div><div><Label htmlFor="minimum-lead">Antecedência mínima (minutos)</Label><Input id="minimum-lead" name="minimum_lead_minutes" type="number" min="0" defaultValue={settings.minimum_lead_minutes} /></div><div><Label htmlFor="booking-horizon">Horizonte de reserva (dias)</Label><Input id="booking-horizon" name="booking_horizon_days" type="number" min="1" max="365" defaultValue={settings.booking_horizon_days} /></div><div><Label htmlFor="retention-months">Retenção de dados (meses)</Label><Input id="retention-months" name="retention_months" type="number" min="1" max="120" defaultValue={settings.retention_months} /></div><div className="self-end"><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar definições</Button></div><div className="sm:col-span-2"><Message state={state} /></div></form>; }
+export function OrderingRulesForm({ settings }: { settings: OrderingSettings }) {
+  const [state, action, pending] = useActionState(updateOrderingRulesAction, initial);
+  return <form action={action}>
+    <FieldGroup className="grid sm:grid-cols-2">
+      <Field orientation="horizontal" className="rounded-xl border p-4"><Switch id="phone-required" name="phone_required" defaultChecked={settings.phone_required} /><FieldLabel htmlFor="phone-required">Telefone obrigatório</FieldLabel></Field>
+      <Field orientation="horizontal" className="rounded-xl border p-4"><Switch id="notes-required" name="general_notes_required" defaultChecked={settings.general_notes_required} /><FieldLabel htmlFor="notes-required">Observações obrigatórias</FieldLabel></Field>
+      <Field><FieldLabel htmlFor="minimum-lead">Antecedência mínima (minutos)</FieldLabel><Input id="minimum-lead" name="minimum_lead_minutes" type="number" min="0" defaultValue={settings.minimum_lead_minutes} required /></Field>
+      <Field><FieldLabel htmlFor="booking-horizon">Horizonte de reserva (dias)</FieldLabel><Input id="booking-horizon" name="booking_horizon_days" type="number" min="1" max="365" defaultValue={settings.booking_horizon_days} required /></Field>
+      <Field className="sm:col-span-2"><Message state={state} /><Button className="w-fit" disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar regras</Button></Field>
+    </FieldGroup>
+  </form>;
+}
+
+export function RetentionSettingsForm({ settings }: { settings: OrderingSettings }) {
+  const [state, action, pending] = useActionState(updateRetentionSettingsAction, initial);
+  return <form action={action}>
+    <FieldGroup>
+      <Field><FieldLabel htmlFor="retention-months">Retenção de dados (meses)</FieldLabel><Input id="retention-months" name="retention_months" type="number" min="1" max="120" defaultValue={settings.retention_months} required /></Field>
+      <Field><Message state={state} /><Button className="w-fit" disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar retenção</Button></Field>
+    </FieldGroup>
+  </form>;
+}
 
 export function LocationForm() { const [state, action, pending] = useActionState(createLocationAction, initial); return <form action={action} className="grid gap-3 sm:grid-cols-3"><Input name="name" aria-label="Nome do local" placeholder="Nome do local" required /><Input name="address" aria-label="Morada" placeholder="Morada" required /><NativeSelect name="kind" defaultValue="store" aria-label="Tipo de local"><NativeSelectOption value="store">Loja</NativeSelectOption><NativeSelectOption value="kitchen">Cozinha</NativeSelectOption></NativeSelect><div className="sm:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar local</Button></div></form>; }
 
@@ -186,40 +208,64 @@ export function CategoryTable({ categories }: { categories: Category[] }) {
 
 export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createProductAction, initial);
-  return <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    <NativeSelect name="category_id" defaultValue={categories[0]?.id} aria-label="Categoria" required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect>
-    <Input name="name" aria-label="Nome do artigo" placeholder="Nome do artigo" required />
-    <Input name="description" aria-label="Descrição" placeholder="Descrição" />
-    <Input name="unit_label" aria-label="Unidade" placeholder="Unidade (kg, tab., dose)" required />
-    <Input name="minimum_quantity" aria-label="Quantidade mínima" type="number" min="0.001" step="0.001" defaultValue="1" />
-    <Input name="quantity_step" aria-label="Incremento" type="number" min="0.001" step="0.001" defaultValue="1" />
-    <div className="sm:col-span-2 lg:col-span-3"><Label htmlFor="product-variations">Variações (opcional, uma por linha)</Label><Textarea id="product-variations" name="variations" className="mt-2" placeholder={"Com recheio\nSem recheio"} /></div>
-    <div className="flex items-center gap-2"><Switch id="requires-note" name="requires_note" /><Label htmlFor="requires-note">Observação obrigatória</Label></div>
-    <div className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="mt-2" disabled={pending}><Plus />Adicionar artigo</Button></div>
+  return <form action={action}>
+    <FieldGroup className="grid sm:grid-cols-2 lg:grid-cols-3">
+      <Field><FieldLabel htmlFor="product-category">Categoria</FieldLabel><NativeSelect id="product-category" name="category_id" defaultValue={categories[0]?.id} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></Field>
+      <Field><FieldLabel htmlFor="product-name">Nome</FieldLabel><Input id="product-name" name="name" placeholder="Nome do artigo" required /></Field>
+      <Field><FieldLabel htmlFor="product-description">Descrição</FieldLabel><Input id="product-description" name="description" placeholder="Descrição" /></Field>
+      <Field><FieldLabel htmlFor="product-unit">Unidade</FieldLabel><Input id="product-unit" name="unit_label" placeholder="kg, tab., dose…" required /></Field>
+      <Field><FieldLabel htmlFor="product-minimum">Quantidade mínima</FieldLabel><Input id="product-minimum" name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
+      <Field><FieldLabel htmlFor="product-step">Incremento</FieldLabel><Input id="product-step" name="quantity_step" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
+      <Field><FieldLabel htmlFor="product-position">Posição na categoria</FieldLabel><Input id="product-position" name="position" type="number" min="0" defaultValue="0" required /></Field>
+      <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor="product-variations">Variações (opcional, uma por linha)</FieldLabel><Textarea id="product-variations" name="variations" placeholder={"Com recheio\nSem recheio"} /></Field>
+      <Field orientation="horizontal"><Switch id="requires-note" name="requires_note" /><FieldLabel htmlFor="requires-note">Observação obrigatória</FieldLabel></Field>
+      <Field className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="w-fit" disabled={pending || !categories.length}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar artigo</Button></Field>
+    </FieldGroup>
   </form>;
 }
 
-export function ProductVariationsForm({ product }: { product: Product }) {
+export function ProductEditForm({ product, categories }: { product: Product; categories: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
-  const fieldId = `product-variations-${product.id}`;
+  const fieldId = `product-edit-${product.id}`;
   const submit = (data: FormData) => start(async () => {
     setError("");
-    const result = await updateProductVariationsAction(initial, data);
+    const result = await updateProductAction(initial, data);
     if (!result.ok) { setError(result.message); return; }
     setOpen(false);
-    showUndoToast(result.message, () => updateProductVariationsAction(initial, formData({ product_id: product.id, variations: product.variations.join("\n") })));
+    showUndoToast(result.message, () => updateProductAction(initial, formData({
+      product_id: product.id,
+      category_id: product.category_id,
+      name: product.name,
+      description: product.description,
+      unit_label: product.unit_label,
+      minimum_quantity: product.minimum_quantity,
+      quantity_step: product.quantity_step,
+      position: product.position,
+      variations: product.variations.join("\n"),
+      requires_note: product.requires_note,
+    })));
   });
   return <Dialog open={open} onOpenChange={setOpen}>
-    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Variações</Button></DialogTrigger>
-    <DialogContent>
-      <DialogHeader><DialogTitle>Variações · {product.name}</DialogTitle><DialogDescription>Uma opção por linha. Deixe vazio se o artigo não tiver variações.</DialogDescription></DialogHeader>
-      <form action={submit} className="space-y-4">
+    <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
+    <DialogContent className="max-w-3xl">
+      <DialogHeader><DialogTitle>Editar artigo · {product.name}</DialogTitle><DialogDescription>Atualize todos os dados usados no catálogo e nos formulários de encomenda.</DialogDescription></DialogHeader>
+      <form action={submit}>
         <input type="hidden" name="product_id" value={product.id} />
-        <div className="space-y-2"><Label htmlFor={fieldId}>Variações</Label><Textarea id={fieldId} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
-        <Message state={{ ok: false, message: error }} />
-        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar variações</Button></DialogFooter>
+        <FieldGroup className="grid sm:grid-cols-2 lg:grid-cols-3">
+          <Field><FieldLabel htmlFor={`${fieldId}-category`}>Categoria</FieldLabel><NativeSelect id={`${fieldId}-category`} name="category_id" defaultValue={product.category_id} required>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-name`}>Nome</FieldLabel><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-description`}>Descrição</FieldLabel><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-unit`}>Unidade</FieldLabel><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-minimum`}>Quantidade mínima</FieldLabel><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-step`}>Incremento</FieldLabel><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-position`}>Posição na categoria</FieldLabel><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></Field>
+          <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor={`${fieldId}-variations`}>Variações (opcional, uma por linha)</FieldLabel><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></Field>
+          <Field orientation="horizontal"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><FieldLabel htmlFor={`${fieldId}-requires-note`}>Observação obrigatória</FieldLabel></Field>
+          {error && <FieldError className="sm:col-span-2 lg:col-span-3">{error}</FieldError>}
+          <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>
+        </FieldGroup>
       </form>
     </DialogContent>
   </Dialog>;
