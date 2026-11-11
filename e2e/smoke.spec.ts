@@ -150,7 +150,6 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await store.getByLabel("Hora de levantamento").click();
   await store.getByRole("option").first().click();
   await store.getByLabel("Nome do cliente").fill(`Cliente sazonal ${testInfo.project.name}`);
-  await store.getByLabel(/^Email/).fill(`sazonal-${testInfo.project.name.toLowerCase().replace(/\s+/g, "-")}@example.pt`);
   await store.getByLabel("Telefone").fill("912345678");
   await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
   await store.getByLabel(/^Observação/).fill("Bem passado");
@@ -158,6 +157,15 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
   await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
   await expect(store.getByRole("button", { name: /Aceitar|Rejeitar/ })).toHaveCount(0);
+  await expect(store.getByText("Não indicado", { exact: true })).toBeVisible();
+  await store.getByRole("link", { name: "Editar" }).click();
+  await expect(store.getByRole("heading", { name: /Editar (ENC|SAZ)-/ })).toBeVisible();
+  await expect(store.getByLabel("Email (opcional)")).toHaveValue("");
+  await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
+  await store.getByRole("button", { name: "Guardar alterações" }).click();
+  await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
+  await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
+  await expect(store.getByText("Versão 2", { exact: true }).first()).toBeVisible();
   await store.close();
 });
 

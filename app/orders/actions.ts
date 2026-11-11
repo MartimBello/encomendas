@@ -53,6 +53,30 @@ export async function createSeasonalOrderAction(payload: SeasonalOrderPayload): 
   return { ok: true, data: { orderId: String(data) }, message: "Encomenda sazonal confirmada." };
 }
 
+export async function reviseSeasonalOrderAction(payload: SeasonalOrderPayload): Promise<ActionResult<{ orderId: string }>> {
+  await requireProfile(["store", "admin"]);
+  const parsed = seasonalOrderPayloadSchema.safeParse(payload);
+  if (!parsed.success || !parsed.data.order_id) return { ok: false, message: "Confirme os dados da revisão sazonal." };
+  const supabase = await createClient();
+  const { error } = await supabase!.rpc("submit_seasonal_order_revision", {
+    p_order_id: parsed.data.order_id,
+    p_customer_name: parsed.data.customer_name,
+    p_customer_email: parsed.data.customer_email,
+    p_customer_phone: parsed.data.customer_phone,
+    p_pickup_slot_id: parsed.data.pickup_slot_id,
+    p_pickup_at: parsed.data.pickup_at,
+    p_general_notes: parsed.data.general_notes,
+    p_items: parsed.data.items,
+  });
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/loja/encomendas");
+  revalidatePath("/loja/sazonais");
+  revalidatePath("/cozinha/sazonais");
+  revalidatePath(`/loja/encomendas/${parsed.data.order_id}`);
+  await nudgeNotificationWorker();
+  return { ok: true, data: { orderId: parsed.data.order_id }, message: "Encomenda sazonal atualizada e confirmada." };
+}
+
 export async function reviseOrderAction(payload: OrderPayload): Promise<ActionResult<{ orderId: string }>> {
   await requireProfile(["store", "admin"]);
   const parsed = orderPayloadSchema.safeParse(payload);

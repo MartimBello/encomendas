@@ -1,5 +1,5 @@
 begin;
-select plan(36);
+select plan(40);
 truncate table public.orders cascade;
 
 update public.products
@@ -137,6 +137,28 @@ select lives_ok(
 );
 select is((select rejection_reason from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440100'), 'Sem disponibilidade', 'empty rejection uses the Portuguese default');
 select is((select count(*)::integer from public.notification_outbox where kind = 'order_rejected'), 1, 'rejection email is queued');
+
+set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
+select lives_ok(
+  $$ select public.create_order(
+    '550e8400-e29b-41d4-a716-446655440101',
+    'Cliente Sem Email', '', '912345678',
+    '10000000-0000-4000-8000-000000000003',
+    ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
+    '',
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""}]'::jsonb,
+    null
+  ) $$,
+  'store can create an order without an email'
+);
+select is((select customer_email from public.order_revisions where order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440101')), null::text, 'empty email is stored as null');
+
+set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a003","role":"authenticated"}';
+select lives_ok(
+  $$ select public.accept_order((select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440101'), 1) $$,
+  'kitchen can accept an order without an email'
+);
+select is((select count(*)::integer from public.notification_outbox where channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440101')), 0, 'no email delivery is queued without a recipient');
 
 select * from finish();
 rollback;

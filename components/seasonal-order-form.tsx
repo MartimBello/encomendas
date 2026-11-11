@@ -4,11 +4,11 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, LoaderCircle, Minus, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
-import { fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { createSeasonalOrderAction } from "@/app/orders/actions";
-import type { OrderingSettings, SeasonalCampaign } from "@/lib/domain";
+import { createSeasonalOrderAction, reviseSeasonalOrderAction } from "@/app/orders/actions";
+import type { OrderRevision, OrderingSettings, SeasonalCampaign } from "@/lib/domain";
 import { APP_TIME_ZONE } from "@/lib/dates";
 import { formatQuantity } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,13 @@ type SelectedItem = { quantity: number; note: string };
 
 function itemKey(productId: string, variation = "") { return `${productId}\u0000${variation}`; }
 
-export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCampaign; settings: OrderingSettings }) {
+function initialItems(initial?: OrderRevision) {
+  return Object.fromEntries((initial?.items ?? []).flatMap((item) => item.seasonal_product_id ? [[itemKey(item.seasonal_product_id, item.variation_name || ""), { quantity: Number(item.quantity), note: item.item_note || "" }]] : [])) as Record<string, SelectedItem>;
+}
+
+export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { campaign: SeasonalCampaign; settings: OrderingSettings; orderId?: string; initial?: OrderRevision }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [items, setItems] = useState<Record<string, SelectedItem>>({});
-  const [pickupDate, setPickupDate] = useState<Date>();
-  const [pickupWindowId, setPickupWindowId] = useState("");
-  const [pickupAt, setPickupAt] = useState("");
-  const idempotencyKey = useRef<string | null>(null);
   const products = (campaign.products ?? []).filter((product) => product.active).sort((a, b) => (a.category?.position ?? Number.MAX_SAFE_INTEGER) - (b.category?.position ?? Number.MAX_SAFE_INTEGER) || a.position - b.position);
   const productChoices = products.flatMap((product) => (product.variations.length ? product.variations : [""]).map((variation) => ({ product, variation, key: itemKey(product.id, variation) })));
   const productGroups = [...new Map(productChoices.map((choice) => {
@@ -39,6 +38,14 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
     return [name, { name, choices: productChoices.filter((entry) => (entry.product.category?.name ?? "Outros") === name) }];
   })).values()];
   const slots = (campaign.pickup_slots ?? []).filter((slot) => slot.active && slot.pickup_date >= new Date().toLocaleDateString("sv-SE", { timeZone: APP_TIME_ZONE })).sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.opens_at.localeCompare(b.opens_at));
+  const initialDateKey = initial?.pickup_at ? formatInTimeZone(initial.pickup_at, APP_TIME_ZONE, "yyyy-MM-dd") : "";
+  const initialTime = initial?.pickup_at ? formatInTimeZone(initial.pickup_at, APP_TIME_ZONE, "HH:mm") : "";
+  const initialWindow = slots.find((slot) => slot.pickup_date === initialDateKey && slot.location_id === initial?.pickup_store_id && initialTime >= slot.opens_at.slice(0, 5) && initialTime < slot.closes_at.slice(0, 5));
+  const [items, setItems] = useState<Record<string, SelectedItem>>(() => initialItems(initial));
+  const [pickupDate, setPickupDate] = useState<Date | undefined>(() => initialDateKey ? new Date(`${initialDateKey}T12:00:00`) : undefined);
+  const [pickupWindowId, setPickupWindowId] = useState(initialWindow?.id ?? "");
+  const [pickupAt, setPickupAt] = useState(initial?.pickup_at ?? "");
+  const idempotencyKey = useRef<string | null>(null);
   const selectedDateKey = pickupDate ? format(pickupDate, "yyyy-MM-dd") : "";
   const availableDates = new Set(slots.map((slot) => slot.pickup_date));
   const dateWindows = slots.filter((slot) => slot.pickup_date === selectedDateKey);
@@ -61,13 +68,14 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
     if (!selected.length) { toast.error("Adicione pelo menos um artigo do menu especial."); return; }
     idempotencyKey.current ??= crypto.randomUUID();
     startTransition(async () => {
-      const result = await createSeasonalOrderAction({
-        idempotency_key: idempotencyKey.current!, campaign_id: campaign.id,
+      const payload = {
+        idempotency_key: idempotencyKey.current!, order_id: orderId, campaign_id: campaign.id,
         customer_name: String(formData.get("customer_name") ?? ""), customer_email: String(formData.get("customer_email") ?? ""),
         customer_phone: String(formData.get("customer_phone") ?? ""), pickup_slot_id: String(formData.get("pickup_slot_id") ?? ""),
         pickup_at: String(formData.get("pickup_at") ?? ""),
         general_notes: String(formData.get("general_notes") ?? ""), items: selected,
-      });
+      };
+      const result = orderId ? await reviseSeasonalOrderAction(payload) : await createSeasonalOrderAction(payload);
       if (!result.ok) { toast.error(result.message); return; }
       toast.success(result.message); router.push(`/loja/encomendas/${result.data?.orderId}`); router.refresh();
     });
@@ -75,9 +83,9 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
 
   return <form action={submit} className="space-y-5">
     <Card><CardHeader><CardTitle>Cliente e levantamento</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
-      <div><Label htmlFor="season-customer-name">Nome do cliente *</Label><Input id="season-customer-name" name="customer_name" autoComplete="name" required /></div>
-      <div><Label htmlFor="season-customer-email">Email *</Label><Input id="season-customer-email" name="customer_email" type="email" inputMode="email" autoComplete="email" required /></div>
-      <div><Label htmlFor="season-customer-phone">Telefone {settings.phone_required ? "*" : ""}</Label><Input id="season-customer-phone" name="customer_phone" type="tel" inputMode="tel" autoComplete="tel" required={settings.phone_required} /></div>
+      <div><Label htmlFor="season-customer-name">Nome do cliente *</Label><Input id="season-customer-name" name="customer_name" autoComplete="name" defaultValue={initial?.customer_name ?? ""} required /></div>
+      <div><Label htmlFor="season-customer-email">Email (opcional)</Label><Input id="season-customer-email" name="customer_email" type="email" inputMode="email" autoComplete="email" defaultValue={initial?.customer_email ?? ""} /></div>
+      <div><Label htmlFor="season-customer-phone">Telefone {settings.phone_required ? "*" : ""}</Label><Input id="season-customer-phone" name="customer_phone" type="tel" inputMode="tel" autoComplete="tel" defaultValue={initial?.customer_phone ?? ""} required={settings.phone_required} /></div>
       <div><Label>Data de levantamento *</Label><Popover><PopoverTrigger asChild><Button type="button" variant="outline" aria-label="Data de levantamento" className="mt-2 w-full justify-start font-normal"><CalendarDays />{pickupDate ? format(pickupDate, "PPP", { locale: pt }) : "Escolher data"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={pickupDate} onSelect={(date) => { setPickupDate(date); setPickupWindowId(""); setPickupAt(""); }} disabled={(date) => !availableDates.has(format(date, "yyyy-MM-dd"))} /></PopoverContent></Popover></div>
       <div><Label>Loja de levantamento *</Label><input type="hidden" name="pickup_slot_id" value={pickupWindowId} /><Select value={pickupWindowId} onValueChange={(value) => { setPickupWindowId(value); setPickupAt(""); }} disabled={!pickupDate}><SelectTrigger aria-label="Loja de levantamento" className="mt-2"><SelectValue placeholder="Escolher loja" /></SelectTrigger><SelectContent>{dateWindows.map((slot) => <SelectItem key={slot.id} value={slot.id}>{slot.location?.name} · {slot.opens_at.slice(0, 5)}–{slot.closes_at.slice(0, 5)}</SelectItem>)}</SelectContent></Select></div>
       <div><Label>Hora de levantamento *</Label><input type="hidden" name="pickup_at" value={pickupAt} /><Select value={pickupAt} onValueChange={setPickupAt} disabled={!selectedWindow}><SelectTrigger aria-label="Hora de levantamento" className="mt-2"><SelectValue placeholder="Escolher hora" /></SelectTrigger><SelectContent>{pickupTimes.map((time) => <SelectItem key={time.value} value={time.value}>{time.label}</SelectItem>)}</SelectContent></Select></div>
@@ -98,8 +106,8 @@ export function SeasonalOrderForm({ campaign, settings }: { campaign: SeasonalCa
       {!products.length && <p className="text-sm text-muted-foreground">Esta campanha ainda não tem artigos disponíveis.</p>}
     </CardContent></Card>
 
-    <Card><CardHeader><CardTitle>Observações gerais</CardTitle></CardHeader><CardContent><Label htmlFor="season-general-notes">Notas {settings.general_notes_required ? "*" : ""}</Label><Textarea id="season-general-notes" name="general_notes" required={settings.general_notes_required} maxLength={2000} /></CardContent></Card>
-    <Button size="lg" className="w-full sm:w-auto" disabled={pending || !products.length || !slots.length || !pickupWindowId || !pickupAt}>{pending ? <LoaderCircle className="animate-spin" /> : <Send />}Enviar encomenda sazonal</Button>
+    <Card><CardHeader><CardTitle>Observações gerais</CardTitle></CardHeader><CardContent><Label htmlFor="season-general-notes">Notas {settings.general_notes_required ? "*" : ""}</Label><Textarea id="season-general-notes" name="general_notes" defaultValue={initial?.general_notes ?? ""} required={settings.general_notes_required} maxLength={2000} /></CardContent></Card>
+    <Button size="lg" className="w-full sm:w-auto" disabled={pending || !products.length || !slots.length || !pickupWindowId || !pickupAt}>{pending ? <LoaderCircle className="animate-spin" /> : <Send />}{orderId ? "Guardar alterações" : "Enviar encomenda sazonal"}</Button>
   </form>;
 }
 

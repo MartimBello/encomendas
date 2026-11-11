@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const databaseUuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "Identificador inválido.");
+const optionalCustomerEmail = z.string().trim().max(254).refine((value) => value === "" || z.email().safeParse(value).success, "Indique um email válido.").transform((value) => value.toLowerCase());
 
 export const orderItemSchema = z.object({
   product_id: databaseUuid,
@@ -14,7 +15,7 @@ export const orderPayloadSchema = z.object({
   order_id: databaseUuid.optional(),
   ordering_store_id: databaseUuid.nullable().optional(),
   customer_name: z.string().trim().min(2, "Indique o nome do cliente.").max(120),
-  customer_email: z.email("Indique um email válido.").toLowerCase(),
+  customer_email: optionalCustomerEmail,
   customer_phone: z.string().trim().max(40).default(""),
   pickup_store_id: databaseUuid,
   pickup_at: z.iso.datetime({ offset: true }),
@@ -24,10 +25,11 @@ export const orderPayloadSchema = z.object({
 
 export const seasonalOrderPayloadSchema = z.object({
   idempotency_key: databaseUuid,
+  order_id: databaseUuid.optional(),
   campaign_id: databaseUuid,
   ordering_store_id: databaseUuid.nullable().optional(),
   customer_name: z.string().trim().min(2, "Indique o nome do cliente.").max(120),
-  customer_email: z.email("Indique um email válido.").toLowerCase(),
+  customer_email: optionalCustomerEmail,
   customer_phone: z.string().trim().max(40).default(""),
   pickup_slot_id: databaseUuid,
   pickup_at: z.iso.datetime({ offset: true }),
