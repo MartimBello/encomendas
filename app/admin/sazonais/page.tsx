@@ -1,13 +1,13 @@
-import { CalendarClock, Gift, MapPin, Utensils } from "lucide-react";
+import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { getSeasonalCampaigns } from "@/lib/data";
-import { formatDate, formatDateTime } from "@/lib/dates";
-import type { Location } from "@/lib/domain";
-import { formatQuantity } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/server";
+import { formatDateTime } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
-import { SeasonalCampaignEditForm, SeasonalCampaignForm, SeasonalDeleteButton, SeasonalPickupSlotEditForm, SeasonalPickupSlotForm, SeasonalProductEditForm, SeasonalProductForm, SeasonalToggleButton } from "@/components/seasonal-admin-forms";
+import { SeasonalCampaignCreateDialog } from "@/components/seasonal-admin-forms";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function periodState(opens: string, closes: string) {
   const now = Date.now();
@@ -17,33 +17,37 @@ function periodState(opens: string, closes: string) {
 }
 
 export default async function SeasonalAdminPage() {
-  const supabase = await createClient();
-  const [campaigns, { data: locations }, { data: categories }] = await Promise.all([
-    getSeasonalCampaigns(true),
-    supabase!.from("locations").select("*").eq("kind", "store").eq("active", true).order("name"),
-    supabase!.from("product_categories").select("id,name").eq("active", true).order("position"),
-  ]);
-  const stores = (locations ?? []) as Location[];
+  const campaigns = await getSeasonalCampaigns(true);
+
   return <>
-    <PageHeader title="Campanhas sazonais" description="Configure Natal, Páscoa e outras épocas com período de aceitação, menu e dias próprios de levantamento." />
-    <div className="space-y-5">
-      <Card><CardHeader><CardTitle>Nova campanha</CardTitle></CardHeader><CardContent><SeasonalCampaignForm /></CardContent></Card>
-      <Card><CardHeader><CardTitle>Novo artigo do menu especial</CardTitle></CardHeader><CardContent><SeasonalProductForm campaigns={campaigns} categories={categories ?? []} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>Novo levantamento especial</CardTitle></CardHeader><CardContent><SeasonalPickupSlotForm campaigns={campaigns} stores={stores} /></CardContent></Card>
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Campanhas configuradas</h2>
-        {!campaigns.length && <Card><CardContent className="py-10 text-center text-muted-foreground">Ainda não existem campanhas sazonais.</CardContent></Card>}
-        {campaigns.map((campaign) => {
-          const state = periodState(campaign.ordering_opens_at, campaign.ordering_closes_at);
-          return <Card key={campaign.id} className="overflow-hidden">
-            <CardHeader className="border-b bg-muted/30"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><Gift className="size-5 text-primary" /><CardTitle>{campaign.name}</CardTitle><Badge variant={campaign.active ? state.variant : "outline"}>{campaign.active ? state.label : "Inativa"}</Badge></div><p className="mt-2 text-sm text-muted-foreground">{campaign.description || "Sem descrição"}</p><p className="mt-2 text-sm"><strong>Aceitação:</strong> {formatDateTime(campaign.ordering_opens_at)} – {formatDateTime(campaign.ordering_closes_at)}</p></div><div className="flex items-center gap-2"><SeasonalCampaignEditForm campaign={campaign} /><SeasonalToggleButton kind="campaign" id={campaign.id} active={campaign.active} /></div></div></CardHeader>
-            <CardContent className="grid gap-6 pt-5 lg:grid-cols-2">
-              <div><h3 className="mb-3 flex items-center gap-2 font-semibold"><Utensils className="size-4 text-primary" />Menu especial</h3><div className="space-y-2">{campaign.products?.length ? [...campaign.products].sort((a, b) => (a.category?.position ?? Number.MAX_SAFE_INTEGER) - (b.category?.position ?? Number.MAX_SAFE_INTEGER) || a.position - b.position).map((product) => <article key={product.id} aria-label={`Artigo ${product.name}`} className="flex flex-col justify-between gap-3 rounded-xl border p-3 xl:flex-row xl:items-center"><div><p className="font-medium">{product.name}</p><p className="text-xs text-muted-foreground">{product.category?.name ?? "Outros"} · mín. {formatQuantity(product.minimum_quantity)} · passo {formatQuantity(product.quantity_step)} {product.unit_label}{product.requires_note ? " · nota obrigatória" : ""}{product.stock_limit !== null ? ` · stock ${formatQuantity(product.stock_limit)}` : " · sem limite de stock"}</p>{product.variations.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Variações: {product.variations.join(" · ")}</p>}</div><div className="flex flex-wrap items-center gap-2"><SeasonalProductEditForm product={product} categories={categories ?? []} /><SeasonalToggleButton kind="product" id={product.id} active={product.active} /><SeasonalDeleteButton kind="product" id={product.id} name={product.name} /></div></article>) : <p className="text-sm text-muted-foreground">Sem artigos.</p>}</div></div>
-              <div><h3 className="mb-3 flex items-center gap-2 font-semibold"><CalendarClock className="size-4 text-primary" />Dias de levantamento</h3><div className="space-y-2">{campaign.pickup_slots?.length ? [...campaign.pickup_slots].sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.opens_at.localeCompare(b.opens_at)).map((slot) => <article key={slot.id} aria-label={`Levantamento ${formatDate(`${slot.pickup_date}T12:00:00Z`)} ${slot.location?.name ?? "Loja"}`} className="flex flex-col justify-between gap-3 rounded-xl border p-3 xl:flex-row xl:items-center"><div><p className="font-medium">{formatDate(`${slot.pickup_date}T12:00:00Z`)} · {slot.opens_at.slice(0, 5)}–{slot.closes_at.slice(0, 5)}</p><p className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3" />{slot.location?.name} · escolhas a cada {slot.slot_minutes} min</p></div><div className="flex flex-wrap items-center gap-2"><SeasonalPickupSlotEditForm slot={slot} stores={stores} /><SeasonalToggleButton kind="slot" id={slot.id} active={slot.active} /><SeasonalDeleteButton kind="slot" id={slot.id} name={`${formatDate(`${slot.pickup_date}T12:00:00Z`)} · ${slot.location?.name ?? "Loja"}`} /></div></article>) : <p className="text-sm text-muted-foreground">Sem dias configurados.</p>}</div></div>
-            </CardContent>
-          </Card>;
-        })}
-      </section>
-    </div>
+    <PageHeader
+      title="Campanhas sazonais"
+      description="Crie campanhas para Natal, Páscoa e outras épocas e abra cada campanha para configurar todos os detalhes."
+      actions={<SeasonalCampaignCreateDialog />}
+    />
+    <Card>
+      <CardHeader>
+        <CardTitle>Campanhas configuradas</CardTitle>
+        <CardDescription>O menu, os dias de levantamento e o período de aceitação são geridos dentro de cada campanha.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader><TableRow><TableHead>Campanha</TableHead><TableHead>Aceitação de encomendas</TableHead><TableHead>Configuração</TableHead><TableHead>Estado</TableHead><TableHead><span className="sr-only">Ações</span></TableHead></TableRow></TableHeader>
+          <TableBody>
+            {campaigns.map((campaign) => {
+              const state = periodState(campaign.ordering_opens_at, campaign.ordering_closes_at);
+              return <TableRow key={campaign.id}>
+                <TableCell><p className="font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{campaign.description || "Sem descrição"}</p></TableCell>
+                <TableCell><p>{formatDateTime(campaign.ordering_opens_at)}</p><p className="text-xs text-muted-foreground">até {formatDateTime(campaign.ordering_closes_at)}</p></TableCell>
+                <TableCell>{campaign.products?.length ?? 0} artigos · {campaign.pickup_slots?.length ?? 0} levantamentos</TableCell>
+                <TableCell><Badge variant={campaign.active ? state.variant : "outline"}>{campaign.active ? state.label : "Inativa"}</Badge></TableCell>
+                <TableCell className="text-right"><Button asChild size="sm" variant="outline"><Link href={`/admin/sazonais/${campaign.id}`}><Pencil data-icon="inline-start" />Editar</Link></Button></TableCell>
+              </TableRow>;
+            })}
+            {!campaigns.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Ainda não existem campanhas sazonais.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   </>;
 }

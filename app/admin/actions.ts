@@ -45,13 +45,22 @@ export async function toggleUserAction(userId: string, active: boolean): Promise
   revalidatePath("/admin/utilizadores"); return { ok: true, message: active ? "Conta ativada." : "Conta desativada." };
 }
 
-export async function updateSettingsAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function updateOrderingRulesAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const actor = await requireProfile(["admin"]);
-  const parsed = settingsSchema.safeParse({ phone_required: formData.get("phone_required") === "on", general_notes_required: formData.get("general_notes_required") === "on", minimum_lead_minutes: formData.get("minimum_lead_minutes"), booking_horizon_days: formData.get("booking_horizon_days"), retention_months: formData.get("retention_months") });
-  if (!parsed.success) return { ok: false, message: "Verifique os valores das definições." };
+  const parsed = settingsSchema.pick({ phone_required: true, general_notes_required: true, minimum_lead_minutes: true, booking_horizon_days: true }).safeParse({ phone_required: formData.get("phone_required") === "on", general_notes_required: formData.get("general_notes_required") === "on", minimum_lead_minutes: formData.get("minimum_lead_minutes"), booking_horizon_days: formData.get("booking_horizon_days") });
+  if (!parsed.success) return { ok: false, message: "Verifique os valores das regras de encomenda." };
   const supabase = await createClient(); const { error } = await supabase!.from("ordering_settings").update({ ...parsed.data, updated_by: actor.id }).eq("id", true);
   if (error) return { ok: false, message: databaseError(error) };
-  revalidatePath("/admin/definicoes"); return { ok: true, message: "Definições guardadas." };
+  revalidatePath("/admin/definicoes"); return { ok: true, message: "Regras de encomenda guardadas." };
+}
+
+export async function updateRetentionSettingsAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const actor = await requireProfile(["admin"]);
+  const parsed = settingsSchema.pick({ retention_months: true }).safeParse({ retention_months: formData.get("retention_months") });
+  if (!parsed.success) return { ok: false, message: "Indique uma retenção entre 1 e 120 meses." };
+  const supabase = await createClient(); const { error } = await supabase!.from("ordering_settings").update({ ...parsed.data, updated_by: actor.id }).eq("id", true);
+  if (error) return { ok: false, message: databaseError(error) };
+  revalidatePath("/admin/definicoes"); return { ok: true, message: "Retenção de dados guardada." };
 }
 
 export async function createLocationAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -131,28 +140,35 @@ export async function reorderCategoriesAction(categoryIds: string[]): Promise<Ac
 function revalidateCategoryRoutes() {
   revalidatePath("/admin/catalogo");
   revalidatePath("/admin/sazonais");
+  revalidatePath("/admin/sazonais/[campaignId]", "page");
   revalidatePath("/loja/encomendas/nova");
   revalidatePath("/loja/sazonais/[campaignId]", "page");
 }
 
 export async function createProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2), description: z.string().trim(), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
+  const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
   if (!parsed.success || !variations.success) return { ok: false, message: "Verifique os dados do artigo e indique no máximo 20 variações." };
-  const supabase = await createClient(); const { error } = await supabase!.from("products").insert({ ...parsed.data, variations: variations.data }); if (error) return { ok: false, message: databaseError(error) }; revalidatePath("/admin/catalogo"); return { ok: true, message: "Artigo criado." };
+  const supabase = await createClient(); const { error } = await supabase!.from("products").insert({ ...parsed.data, variations: variations.data }); if (error) return { ok: false, message: databaseError(error) }; revalidateProductRoutes(); return { ok: true, message: "Artigo criado." };
 }
 
-export async function updateProductVariationsAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function updateProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
-  const productId = z.uuid().safeParse(formData.get("product_id"));
+  const parsed = z.object({ product_id: z.uuid(), category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean() }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
-  if (!productId.success || !variations.success) return { ok: false, message: "Indique no máximo 20 variações, uma por linha." };
+  if (!parsed.success || !variations.success) return { ok: false, message: "Verifique os dados do artigo e indique no máximo 20 variações." };
+  const { product_id: productId, ...updates } = parsed.data;
   const supabase = await createClient();
-  const { data, error } = await supabase!.from("products").update({ variations: variations.data }).eq("id", productId.data).select("id").maybeSingle();
+  const { data, error } = await supabase!.from("products").update({ ...updates, variations: variations.data }).eq("id", productId).select("id").maybeSingle();
   if (error || !data) return { ok: false, message: databaseError(error, "O artigo não existe ou não pôde ser atualizado.") };
-  revalidatePath("/admin/catalogo"); revalidatePath("/loja/encomendas/nova");
-  return { ok: true, message: "Variações atualizadas." };
+  revalidateProductRoutes();
+  return { ok: true, message: "Artigo atualizado." };
+}
+
+function revalidateProductRoutes() {
+  revalidatePath("/admin/catalogo");
+  revalidatePath("/loja/encomendas/nova");
 }
 
 export async function toggleProductAction(productId: string, active: boolean): Promise<ActionResult> {
@@ -206,7 +222,7 @@ export async function updateSeasonalCampaignAction(_previous: ActionResult, form
   const supabase = await createClient();
   const { data, error } = await supabase!.from("seasonal_campaigns").update({ name: parsed.data.name, slug: parsed.data.slug, description: parsed.data.description, ordering_opens_at: opensAt, ordering_closes_at: closesAt, updated_by: actor.id }).eq("id", parsed.data.campaign_id).select("id").maybeSingle();
   if (error || !data) return { ok: false, message: databaseError(error, "A campanha não existe ou não pôde ser atualizada.") };
-  revalidatePath("/admin/sazonais"); revalidatePath("/loja/sazonais"); revalidatePath(`/loja/sazonais/${parsed.data.campaign_id}`);
+  revalidateSeasonalRoutes(parsed.data.campaign_id);
   return { ok: true, message: "Campanha atualizada." };
 }
 
@@ -219,6 +235,7 @@ export async function toggleSeasonalCampaignAction(campaignId: string, active: b
 
 function revalidateSeasonalRoutes(campaignId: string) {
   revalidatePath("/admin/sazonais");
+  revalidatePath(`/admin/sazonais/${campaignId}`);
   revalidatePath("/loja/sazonais");
   revalidatePath(`/loja/sazonais/${campaignId}`);
 }
