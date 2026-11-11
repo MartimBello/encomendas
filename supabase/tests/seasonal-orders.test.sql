@@ -1,5 +1,5 @@
 begin;
-select plan(31);
+select plan(37);
 
 select has_table('public', 'seasonal_campaigns', 'seasonal campaigns table exists');
 select has_table('public', 'seasonal_products', 'seasonal products table exists');
@@ -11,6 +11,7 @@ select has_column('public', 'seasonal_products', 'variations', 'seasonal product
 select has_column('public', 'order_items', 'seasonal_product_id', 'seasonal snapshots retain their stock identity');
 select has_column('public', 'order_items', 'variation_name', 'order lines snapshot their variation');
 select has_function('public', 'create_seasonal_order', array['uuid','uuid','text','text','text','uuid','timestamp with time zone','text','jsonb','uuid'], 'seasonal order RPC exists');
+select has_function('public', 'submit_seasonal_order_revision', array['uuid','text','text','text','uuid','timestamp with time zone','text','jsonb'], 'seasonal revision RPC exists');
 
 insert into public.seasonal_campaigns (id, name, slug, description, ordering_opens_at, ordering_closes_at, active)
 values ('49000000-0000-4000-8000-000000000001', 'Natal teste', 'natal-teste', 'Menu de teste', now() - interval '1 day', now() + interval '1 day', true);
@@ -95,6 +96,22 @@ select lives_ok(
   'cancelled seasonal orders release stock'
 );
 
+select lives_ok(
+  $$ select public.submit_seasonal_order_revision(
+    (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206'),
+    'Cliente Sazonal Revisto', '', '912345678',
+    '49200000-0000-4000-8000-000000000001',
+    (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:30') at time zone 'Europe/Lisbon',
+    'Versão revista',
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb
+  ) $$,
+  'store can revise a seasonal order with its campaign menu'
+);
+select ok((select current_version = 2 and status = 'accepted' and accepted_revision_id = current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206'), 'seasonal revision is versioned and confirmed automatically');
+select is((select quantity from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), 2.500::numeric, 'seasonal revision replaces the reserved quantity without double counting stock');
+select is((select customer_email from public.order_revisions where id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), null::text, 'seasonal revision stores an empty email as null');
+select is((select count(*)::integer from public.notification_outbox where kind = 'order_updated_accepted' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), 0, 'seasonal revision without email does not queue a delivery');
+
 select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440204', '49000000-0000-4000-8000-000000000001',
@@ -113,7 +130,7 @@ select throws_ok(
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '', '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb
   ) $$,
-  'P0001', 'As encomendas sazonais não podem usar o catálogo regular.',
+  'P0001', 'Use a edição própria da campanha sazonal.',
   'regular catalog revisions cannot replace a seasonal menu'
 );
 

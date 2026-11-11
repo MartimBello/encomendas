@@ -73,7 +73,7 @@ npm run supabase:stop
 
 1. Crie os projetos Vercel e Supabase Cloud e configure os valores de `.env.example` em ambos os ambientes.
 2. Ligue o projeto com `npx supabase link --project-ref ...`, reveja `npx supabase db push --dry-run` e aplique com `npx supabase db push`.
-3. Faça deploy de `process-notifications` e configure `RESEND_API_KEY`, `RESEND_FROM`, chaves VAPID e `NOTIFICATION_WORKER_SECRET` com `npx supabase secrets set`.
+3. Faça deploy de `process-notifications` e configure `RESEND_API_KEY`, `RESEND_FROM="Encomendas <encomendas@encomendas.olguinhas.pt>"`, chaves VAPID e `NOTIFICATION_WORKER_SECRET` com `npx supabase secrets set`.
 4. Configure o SMTP personalizado do Supabase Auth com as credenciais SMTP do domínio verificado no Resend, para convites e recuperação de palavra-passe.
 5. Crie um Database Webhook em inserts de `notification_outbox` para a Edge Function e um Supabase Cron a cada minuto como retry. O webhook deve usar a chave de serviço; o cron deve enviar `x-worker-secret` a partir do Vault.
 6. Defina `NEXT_PUBLIC_SITE_URL`, URLs autorizadas do Auth e as variáveis Supabase/VAPID/Resend no Vercel.

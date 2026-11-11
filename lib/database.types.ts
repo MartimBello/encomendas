@@ -391,6 +391,9 @@ isOneToOne: false
 "assert_valid_seasonal_items":
 { Args: { "p_campaign_id": string,"p_items": Json }; Returns: undefined
                            },
+"assert_valid_seasonal_revision_items":
+{ Args: { "p_campaign_id": string,"p_items": Json,"p_order_id": string }; Returns: undefined
+                           },
 "can_read_order":
 { Args: { "target": Omit<Database["public"]['Tables']["orders"]['Row'], Database["public"]['Tables']["orders"]['ComputedFields']> }; Returns: boolean
                            },
@@ -442,6 +445,12 @@ isOneToOne: false
                            },
 "submit_order_revision":
 { Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: number
+                           },
+"submit_seasonal_order_revision":
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: number
+                           },
+"skip_email_without_recipient":
+{ Args: Record<PropertyKey, never>; Returns: unknown
                            }
           }
           Enums: {

@@ -46,7 +46,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
         <CardHeader><CardTitle>Cliente e levantamento</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="font-semibold">{revision.customer_name}</p>
-          <p className="flex items-center gap-2 text-muted-foreground"><Mail className="size-4" />{revision.customer_email || "Dados removidos"}</p>
+          <p className="flex items-center gap-2 text-muted-foreground"><Mail className="size-4" />{revision.customer_email || "Não indicado"}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><Phone className="size-4" />{revision.customer_phone || "—"}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{formatDateTime(revision.pickup_at)}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><MapPin className="size-4" />{order.pickup_store?.name}</p>
