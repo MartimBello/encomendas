@@ -21,4 +21,11 @@ describe("Portuguese order email", () => {
     expect(rendered.html).toContain("ficou confirmada automaticamente");
     expect(rendered.html).not.toContain("A cozinha confirmou");
   });
+
+  it("lists the weight of every individual unit", () => {
+    const order = { order_number: "SAZ-20261105-00002", pickup_store: { id: "1", name: "Loja Centro", address: "Porto" }, rejection_reason: null } as Order;
+    const revision = { version: 1, customer_name: "Ana", pickup_at: "2026-11-19T10:00:00Z", general_notes: "" } as OrderRevision;
+    const rendered = renderOrderEmail("order_accepted", order, revision, [{ product_id: null, product_name: "Peru", unit_label: "un.", quantity: 3, unit_weights: [4, 3, 5], unit_weight_label: "kg" }]);
+    expect(rendered.html).toContain("3 un. · 4 kg, 3 kg, 5 kg");
+  });
 });

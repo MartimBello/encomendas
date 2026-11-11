@@ -20,18 +20,18 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type SelectedItem = { quantity: number; note: string };
+type SelectedItem = { quantity: number; unit_weights: number[]; note: string };
 
 function itemKey(productId: string, variation = "") { return `${productId}\u0000${variation}`; }
 
 function initialItems(initial?: OrderRevision) {
-  return Object.fromEntries((initial?.items ?? []).flatMap((item) => item.seasonal_product_id ? [[itemKey(item.seasonal_product_id, item.variation_name || ""), { quantity: Number(item.quantity), note: item.item_note || "" }]] : [])) as Record<string, SelectedItem>;
+  return Object.fromEntries((initial?.items ?? []).flatMap((item) => item.seasonal_product_id ? [[itemKey(item.seasonal_product_id, item.variation_name || ""), { quantity: Number(item.quantity), unit_weights: item.unit_weights?.map(Number) ?? [], note: item.item_note || "" }]] : [])) as Record<string, SelectedItem>;
 }
 
 export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { campaign: SeasonalCampaign; settings: OrderingSettings; orderId?: string; initial?: OrderRevision }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const products = (campaign.products ?? []).filter((product) => product.active).sort((a, b) => (a.category?.position ?? Number.MAX_SAFE_INTEGER) - (b.category?.position ?? Number.MAX_SAFE_INTEGER) || a.position - b.position);
+  const products = (campaign.products ?? []).filter((product) => product.active).sort((a, b) => (a.category?.position ?? Number.MAX_SAFE_INTEGER) - (b.category?.position ?? Number.MAX_SAFE_INTEGER) || a.position - b.position).map((product) => product.quantity_mode === "selection" ? { ...product, unit_label: "×" } : product);
   const productChoices = products.flatMap((product) => (product.variations.length ? product.variations : [""]).map((variation) => ({ product, variation, key: itemKey(product.id, variation) })));
   const productGroups = [...new Map(productChoices.map((choice) => {
     const name = choice.product.category?.name ?? "Outros";
@@ -52,20 +52,30 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
   const selectedWindow = slots.find((slot) => slot.id === pickupWindowId);
   const pickupTimes = selectedWindow ? buildPickupTimes(selectedWindow.pickup_date, selectedWindow.opens_at, selectedWindow.closes_at, selectedWindow.slot_minutes) : [];
 
-  function changeQuantity(key: string, minimum: number, step: number, direction: 1 | -1) {
+  function changeQuantity(key: string, minimum: number, step: number, direction: 1 | -1, unitWeights = false) {
     setItems((current) => {
       const existing = current[key]?.quantity ?? 0;
       const quantity = direction === 1 ? (existing === 0 ? minimum : existing + step) : existing <= minimum ? 0 : Math.max(minimum, existing - step);
-      return { ...current, [key]: { quantity: Number(quantity.toFixed(3)), note: current[key]?.note ?? "" } };
+      const normalized = unitWeights ? Math.round(quantity) : Number(quantity.toFixed(3));
+      return { ...current, [key]: {
+        quantity: normalized,
+        unit_weights: unitWeights ? Array.from({ length: normalized }, (_, index) => current[key]?.unit_weights[index] ?? 0) : [],
+        note: current[key]?.note ?? "",
+      } };
     });
   }
 
   function submit(formData: FormData) {
     const selected = productChoices.flatMap(({ product, variation, key }) => {
       const item = items[key];
-      return item?.quantity > 0 ? [{ product_id: product.id, variation, quantity: item.quantity, note: item.note }] : [];
+      return item?.quantity > 0 ? [{ product_id: product.id, variation, quantity: item.quantity, unit_weights: item.unit_weights, note: item.note }] : [];
     });
     if (!selected.length) { toast.error("Adicione pelo menos um artigo do menu especial."); return; }
+    const invalidWeights = productChoices.some(({ product, key }) => {
+      const item = items[key];
+      return product.quantity_mode === "unit_weight" && item?.quantity > 0 && (item.unit_weights.length !== item.quantity || item.unit_weights.some((weight) => !Number.isFinite(weight) || weight <= 0));
+    });
+    if (invalidWeights) { toast.error("Indique o peso de cada unidade nos artigos assinalados."); return; }
     idempotencyKey.current ??= crypto.randomUUID();
     startTransition(async () => {
       const payload = {
@@ -77,6 +87,7 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
       };
       const result = orderId ? await reviseSeasonalOrderAction(payload) : await createSeasonalOrderAction(payload);
       if (!result.ok) { toast.error(result.message); return; }
+      if (!orderId) { setItems({}); setPickupDate(undefined); setPickupWindowId(""); setPickupAt(""); idempotencyKey.current = null; }
       toast.success(result.message); router.push(`/loja/encomendas/${result.data?.orderId}`); router.refresh();
     });
   }
@@ -95,11 +106,11 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
       {productGroups.map((group) => <section key={group.name} className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold text-muted-foreground">{group.name}</h3>
         <div className="grid gap-4 lg:grid-cols-2">{group.choices.map(({ product, variation, key }, choiceIndex) => {
-          const selected = items[key] ?? { quantity: 0, note: "" };
+          const selected = items[key] ?? { quantity: 0, unit_weights: [], note: "" };
           const choiceName = `${product.name}${variation ? ` · ${variation}` : ""}`;
           return <article key={key} className="rounded-xl border p-4">
-            <div className="flex items-start justify-between gap-4"><div><h4 className="font-semibold">{product.name}</h4>{variation && <p className="mt-1 font-medium text-primary">{variation}</p>}{product.description && <p className="mt-1 text-sm text-muted-foreground">{product.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Mínimo {formatQuantity(product.minimum_quantity)} · incrementos de {formatQuantity(product.quantity_step)} {product.unit_label}{product.stock_limit !== null ? ` · stock limitado a ${formatQuantity(product.stock_limit)}` : ""}</p></div><div className="flex shrink-0 items-center gap-2"><Button type="button" variant="outline" size="icon" aria-label={`Retirar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, -1)}><Minus /></Button><span className="min-w-16 text-center font-semibold">{formatQuantity(selected.quantity)} {product.unit_label}</span><Button type="button" size="icon" aria-label={`Adicionar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, 1)}><Plus /></Button></div></div>
-            {selected.quantity > 0 && <div className="mt-4"><Label htmlFor={`season-note-${product.id}-${choiceIndex}`}>Observação {product.requires_note ? "*" : ""}</Label><Input id={`season-note-${product.id}-${choiceIndex}`} value={selected.note} required={product.requires_note} onChange={(event) => setItems((current) => ({ ...current, [key]: { ...selected, note: event.target.value } }))} placeholder="Preparação, corte ou outra indicação" /></div>}
+            <div className="flex items-start justify-between gap-4"><div><h4 className="font-semibold">{product.name}</h4>{variation && <p className="mt-1 font-medium text-primary">{variation}</p>}{product.description && <p className="mt-1 text-sm text-muted-foreground">{product.description}</p>}<p className="mt-2 text-xs text-muted-foreground">{product.quantity_mode === "selection" ? "Escolha por opção" : `Mínimo ${formatQuantity(product.minimum_quantity)} · incrementos de ${formatQuantity(product.quantity_step)} ${product.unit_label}`}{product.stock_limit !== null ? ` · stock limitado a ${formatQuantity(product.stock_limit)}` : ""}</p></div><div className="flex shrink-0 items-center gap-2"><Button type="button" variant="outline" size="icon" aria-label={`Retirar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, -1, product.quantity_mode === "unit_weight")}><Minus /></Button><span className="min-w-16 text-center font-semibold">{formatQuantity(selected.quantity)} {product.unit_label}</span><Button type="button" size="icon" aria-label={`Adicionar ${choiceName}`} onClick={() => changeQuantity(key, product.minimum_quantity, product.quantity_step, 1, product.quantity_mode === "unit_weight")}><Plus /></Button></div></div>
+            {selected.quantity > 0 && <div className="mt-4 flex flex-col gap-4">{product.quantity_mode === "unit_weight" && <div className="grid gap-3 sm:grid-cols-2"><p className="text-sm font-medium sm:col-span-2">Peso de cada unidade</p>{selected.unit_weights.map((weight, index) => <div key={index}><Label htmlFor={`season-weight-${product.id}-${choiceIndex}-${index}`}>Unidade {index + 1} ({product.unit_weight_label}) *</Label><Input id={`season-weight-${product.id}-${choiceIndex}-${index}`} type="number" min="0.001" step="0.001" value={weight || ""} required onChange={(event) => setItems((current) => ({ ...current, [key]: { ...selected, unit_weights: selected.unit_weights.map((entry, weightIndex) => weightIndex === index ? Number(event.target.value) : entry) } }))} /></div>)}</div>}<div><Label htmlFor={`season-note-${product.id}-${choiceIndex}`}>Observação {product.requires_note ? "*" : ""}</Label><Input id={`season-note-${product.id}-${choiceIndex}`} value={selected.note} required={product.requires_note} onChange={(event) => setItems((current) => ({ ...current, [key]: { ...selected, note: event.target.value } }))} placeholder="Preparação, corte ou outra indicação" /></div></div>}
           </article>;
         })}</div>
       </section>)}

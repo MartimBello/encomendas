@@ -63,10 +63,11 @@ insert into public.seasonal_campaigns (
 ) on conflict (id) do nothing;
 
 insert into public.seasonal_products (
-  id, campaign_id, category_id, name, description, unit_label, minimum_quantity, quantity_step, variations, requires_note, position
+  id, campaign_id, category_id, name, description, unit_label, minimum_quantity, quantity_step,
+  quantity_mode, unit_weight_label, variations, requires_note, position
 ) values
-  ('41000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Peru assado', 'Peru assado pronto a servir', 'kg', 2, 0.5, array['Com recheio', 'Sem recheio'], true, 10),
-  ('41000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003', 'Bolo-rei', 'Receita tradicional', 'un.', 1, 1, '{}', false, 20)
+  ('41000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Peru assado', 'Peru assado pronto a servir', 'un.', 1, 1, 'unit_weight', 'kg', array['Com recheio', 'Sem recheio'], true, 10),
+  ('41000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003', 'Bolo-rei', 'Receita tradicional', 'un.', 1, 1, 'selection', 'kg', array['Pequeno', 'Grande'], false, 20)
 on conflict (id) do nothing;
 
 insert into public.seasonal_pickup_slots (

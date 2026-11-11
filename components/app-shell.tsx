@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BellRing, ChefHat, ClipboardList, Gift, LogOut, PackageSearch, Settings, ShoppingBag, Store, Users } from "lucide-react";
+import { Archive, BellRing, ChefHat, ClipboardCheck, ClipboardList, Gift, LogOut, MapPinned, PackageSearch, Settings, ShoppingBag, Store, Users } from "lucide-react";
 import { signOutAction } from "@/app/auth/actions";
 import type { AppRole, Profile } from "@/lib/domain";
 import { roleLabels } from "@/lib/domain";
@@ -10,7 +10,14 @@ import { cn, initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PwaInstall } from "@/components/pwa-install";
 
-const navigation: Record<AppRole, { href: string; label: string; icon: typeof Store }[]> = {
+type NavigationItem = {
+  href: string;
+  label: string;
+  icon: typeof Store;
+  children?: Omit<NavigationItem, "children">[];
+};
+
+const navigation: Record<AppRole, NavigationItem[]> = {
   store: [
     { href: "/loja/encomendas", label: "Encomendas", icon: ClipboardList },
     { href: "/loja/encomendas/nova", label: "Nova", icon: ShoppingBag },
@@ -25,7 +32,16 @@ const navigation: Record<AppRole, { href: string; label: string; icon: typeof St
     { href: "/admin/utilizadores", label: "Equipa", icon: Users },
     { href: "/admin/catalogo", label: "Catálogo", icon: ShoppingBag },
     { href: "/admin/sazonais", label: "Sazonais", icon: Gift },
-    { href: "/admin/definicoes", label: "Definições", icon: Settings },
+    {
+      href: "/admin/definicoes",
+      label: "Definições",
+      icon: Settings,
+      children: [
+        { href: "/admin/definicoes/regras", label: "Regras de encomenda", icon: ClipboardCheck },
+        { href: "/admin/definicoes/locais", label: "Locais", icon: MapPinned },
+        { href: "/admin/definicoes/retencao", label: "Retenção de dados", icon: Archive },
+      ],
+    },
     { href: "/admin/notificacoes", label: "Entregas", icon: BellRing },
   ],
 };
@@ -38,7 +54,16 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
   return <div className="min-h-dvh md:grid md:grid-cols-[240px_1fr]">
     <aside className="hidden border-r bg-card md:flex md:flex-col md:sticky md:top-0 md:h-dvh">
       <div className="flex h-20 items-center gap-3 border-b px-5"><span className="grid size-11 place-items-center rounded-xl bg-primary text-white"><ShoppingBag /></span><div><p className="font-semibold">Encomendas</p><p className="text-xs text-muted-foreground">{roleLabels[profile.role]}</p></div></div>
-      <nav className="flex-1 space-y-1 p-3">{links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors", isActive(href) ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5" />{label}</Link>)}</nav>
+      <nav className="flex-1 space-y-1 p-3">{links.map(({ href, label, icon: Icon, children }) => {
+        const active = isActive(href);
+
+        return <div key={href}>
+          <Link href={href} className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors", active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5" />{label}</Link>
+          {active && children ? <div className="ml-5 mt-1 space-y-1 border-l pl-3">
+            {children.map(({ href: childHref, label: childLabel, icon: ChildIcon }) => <Link key={childHref} href={childHref} className={cn("flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors", isActive(childHref) ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><ChildIcon className="size-4" />{childLabel}</Link>)}
+          </div> : null}
+        </div>;
+      })}</nav>
       <div className="border-t p-4"><div className="mb-3 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-secondary text-sm font-bold">{initials(profile.full_name)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold">{profile.full_name}</p><p className="truncate text-xs text-muted-foreground">{profile.location?.name || roleLabels[profile.role]}</p></div></div><form action={signOutAction} onSubmit={clearDrafts}><Button variant="ghost" className="w-full justify-start"><LogOut /> Terminar sessão</Button></form></div>
     </aside>
     <div className="min-w-0 pb-24 md:pb-0"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden"><div className="flex items-center gap-2 font-semibold"><span className="grid size-9 place-items-center rounded-lg bg-primary text-white"><ShoppingBag className="size-5" /></span> Encomendas</div><span className="grid size-9 place-items-center rounded-full bg-secondary text-xs font-bold">{initials(profile.full_name)}</span></header><main className="mx-auto max-w-[1440px] p-4 sm:p-6 lg:p-8"><div className="no-print mb-4 flex justify-end"><PwaInstall /></div>{children}</main></div>

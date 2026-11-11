@@ -7,6 +7,7 @@ export const orderItemSchema = z.object({
   product_id: databaseUuid,
   variation: z.string().trim().max(120).default(""),
   quantity: z.coerce.number().positive(),
+  unit_weights: z.array(z.coerce.number().positive()).max(100).default([]),
   note: z.string().trim().max(500).default(""),
 });
 

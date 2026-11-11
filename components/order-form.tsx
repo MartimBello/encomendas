@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, LoaderCircle, PackagePlus, Send, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { createOrderAction, reviseOrderAction } from "@/app/orders/actions";
 import { buildPickupSlots, formatDateTime, pickupSlotParts } from "@/lib/dates";
 import type { Location, OrderRevision, OrderingSettings, PickupWindow, Product } from "@/lib/domain";
-import { cn, formatQuantity } from "@/lib/utils";
+import { cn, formatItemQuantity, formatQuantity } from "@/lib/utils";
 import type { OrderPayload } from "@/lib/validation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { PickupSlotPicker } from "@/components/pickup-slot-picker";
 
-type DraftItem = { product_id: string; variation: string; quantity: number; note: string };
+type DraftItem = { product_id: string; variation: string; quantity: number; unit_weights: number[]; note: string };
 type Draft = {
   idempotency_key: string;
   customer_name: string;
@@ -45,7 +45,7 @@ function makeDraft(initial?: OrderRevision): Draft {
     pickup_time: pickupParts.time,
     pickup_at: initial?.pickup_at || "",
     general_notes: initial?.general_notes || "",
-    items: initial?.items?.filter((item) => item.product_id).map((item) => ({ product_id: item.product_id!, variation: item.variation_name || "", quantity: Number(item.quantity), note: item.item_note || "" })) || [],
+    items: initial?.items?.filter((item) => item.product_id).map((item) => ({ product_id: item.product_id!, variation: item.variation_name || "", quantity: Number(item.quantity), unit_weights: item.unit_weights?.map(Number) ?? [], note: item.item_note || "" })) || [],
   };
 }
 
@@ -57,6 +57,7 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<Draft>(() => makeDraft(initial));
   const [draftRestored, setDraftRestored] = useState(false);
+  const submitted = useRef(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem(storageKey);
@@ -64,13 +65,14 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
     if (saved) {
       try {
         const value = JSON.parse(saved);
-        if (value.expiresAt > Date.now()) {
+        if (value.version === 2 && value.expiresAt > Date.now()) {
           const savedDraft = value.draft as Partial<Draft>;
           const pickupParts = savedDraft.pickup_at ? pickupSlotParts(savedDraft.pickup_at) : { date: "", time: "" };
           restoredDraft = {
             ...savedDraft,
             pickup_date: savedDraft.pickup_date ?? pickupParts.date,
             pickup_time: savedDraft.pickup_time ?? pickupParts.time,
+            items: savedDraft.items?.map((item) => ({ ...item, unit_weights: Array.isArray(item.unit_weights) ? item.unit_weights.map(Number) : [] })) ?? [],
           };
         } else {
           sessionStorage.removeItem(storageKey);
@@ -95,21 +97,33 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
   }, [storageKey]);
 
   useEffect(() => {
-    if (!draftRestored) return;
-    sessionStorage.setItem(storageKey, JSON.stringify({ draft, expiresAt: Date.now() + 24 * 60 * 60 * 1000 }));
+    if (!draftRestored || submitted.current) return;
+    sessionStorage.setItem(storageKey, JSON.stringify({ version: 2, draft, expiresAt: Date.now() + 24 * 60 * 60 * 1000 }));
   }, [draft, draftRestored, storageKey]);
 
   const slots = useMemo(() => buildPickupSlots(windows, settings.minimum_lead_minutes, settings.booking_horizon_days).filter((slot) => slot.locationId === draft.pickup_store_id), [windows, settings, draft.pickup_store_id]);
-  const productChoices = products.flatMap((product) => (product.variations.length ? product.variations : [""]).map((variation) => ({ product, variation, key: itemKey(product.id, variation) })));
-  const selectedProducts = draft.items.map((item) => ({ item, product: products.find((product) => product.id === item.product_id)!, key: itemKey(item.product_id, item.variation || "") })).filter((entry) => entry.product);
-  const categories = [...new Map(products.map((product) => {
+  const displayProducts = products.map((product) => product.quantity_mode === "selection" ? { ...product, unit_label: "×" } : product);
+  const productChoices = displayProducts.flatMap((product) => (product.variations.length ? product.variations : [""]).map((variation) => ({ product, variation, key: itemKey(product.id, variation) })));
+  const selectedProducts = draft.items.map((item) => ({ item, product: displayProducts.find((product) => product.id === item.product_id)!, key: itemKey(item.product_id, item.variation || "") })).filter((entry) => entry.product);
+  const categories = [...new Map(displayProducts.map((product) => {
     const name = product.category?.name || "Outros";
     return [name, { name, position: product.category?.position ?? Number.MAX_SAFE_INTEGER }];
   })).values()].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, "pt"));
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) { setDraft((current) => ({ ...current, [key]: value })); }
-  function addProduct(product: Product, variation: string) { setDraft((current) => ({ ...current, items: [...current.items, { product_id: product.id, variation, quantity: Number(product.minimum_quantity), note: "" }] })); }
+  function addProduct(product: Product, variation: string) {
+    const quantity = Number(product.minimum_quantity);
+    const unitWeights = product.quantity_mode === "unit_weight" ? Array.from({ length: quantity }, () => 0) : [];
+    setDraft((current) => ({ ...current, items: [...current.items, { product_id: product.id, variation, quantity, unit_weights: unitWeights, note: "" }] }));
+  }
   function setItem(key: string, patch: Partial<DraftItem>) { setDraft((current) => ({ ...current, items: current.items.map((item) => itemKey(item.product_id, item.variation || "") === key ? { ...item, ...patch } : item) })); }
+  function setItemQuantity(key: string, item: DraftItem, product: Product, quantity: number) {
+    const normalized = product.quantity_mode === "unit_weight" ? Math.max(1, Math.round(quantity)) : quantity;
+    const unitWeights = product.quantity_mode === "unit_weight"
+      ? Array.from({ length: normalized }, (_, index) => item.unit_weights[index] ?? 0)
+      : [];
+    setItem(key, { quantity: normalized, unit_weights: unitWeights });
+  }
   function removeProduct(key: string) { setDraft((current) => ({ ...current, items: current.items.filter((item) => itemKey(item.product_id, item.variation || "") !== key) })); }
 
   function next() {
@@ -117,6 +131,8 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
     if (step === 2 && draft.items.length === 0) return toast.error("Adicione pelo menos um artigo.");
     const invalidNote = selectedProducts.some(({ item, product }) => product.requires_note && !item.note.trim());
     if (step === 2 && invalidNote) return toast.error("Preencha as observações obrigatórias dos artigos.");
+    const invalidWeights = selectedProducts.some(({ item, product }) => product.quantity_mode === "unit_weight" && (item.unit_weights.length !== item.quantity || item.unit_weights.some((weight) => !Number.isFinite(weight) || weight <= 0)));
+    if (step === 2 && invalidWeights) return toast.error("Indique o peso de cada unidade nos artigos assinalados.");
     setStep((value) => Math.min(3, value + 1));
   }
 
@@ -137,7 +153,9 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
     startTransition(async () => {
       const result = orderId ? await reviseOrderAction(payload) : await createOrderAction(payload);
       if (!result.ok) { toast.error(result.message); return; }
+      submitted.current = true;
       sessionStorage.removeItem(storageKey);
+      if (!orderId) { setDraft(makeDraft()); setStep(1); }
       toast.success(result.message);
       router.push(`/loja/encomendas/${result.data?.orderId}`);
       router.refresh();
@@ -150,9 +168,9 @@ export function OrderForm({ locations, products, windows, settings, orderId, ini
 
     {step === 1 && <Card><CardHeader><CardTitle>Cliente e levantamento</CardTitle></CardHeader><CardContent className="grid gap-5 md:grid-cols-2"><Field id="customer-name" label="Nome do cliente" required><Input id="customer-name" value={draft.customer_name} onChange={(event) => update("customer_name", event.target.value)} autoComplete="name" /></Field><Field id="customer-email" label="Email (opcional)"><Input id="customer-email" type="email" value={draft.customer_email} onChange={(event) => update("customer_email", event.target.value)} autoComplete="email" /></Field><Field id="customer-phone" label="Telefone" required={settings.phone_required}><Input id="customer-phone" type="tel" value={draft.customer_phone} onChange={(event) => update("customer_phone", event.target.value)} inputMode="tel" /></Field><Field id="pickup-store" label="Loja de levantamento" required><NativeSelect id="pickup-store" value={draft.pickup_store_id} onChange={(event) => setDraft((current) => ({ ...current, pickup_store_id: event.target.value, pickup_date: "", pickup_time: "", pickup_at: "" }))}><NativeSelectOption value="" disabled>Escolher loja</NativeSelectOption>{locations.map((location) => <NativeSelectOption key={location.id} value={location.id}>{location.name}</NativeSelectOption>)}</NativeSelect></Field><div className="md:col-span-2"><PickupSlotPicker key={draft.pickup_store_id || "sem-loja"} slots={slots.slice(0, 240)} date={draft.pickup_date} time={draft.pickup_time} value={draft.pickup_at} disabled={!draft.pickup_store_id} onChange={(selection) => setDraft((current) => ({ ...current, pickup_date: selection.date, pickup_time: selection.time, pickup_at: selection.value }))} /></div><Field id="general-notes" label="Observações gerais" required={settings.general_notes_required} className="md:col-span-2"><Textarea id="general-notes" value={draft.general_notes} onChange={(event) => update("general_notes", event.target.value)} placeholder="Alergias, instruções ou informação útil para a cozinha" /></Field></CardContent></Card>}
 
-    {step === 2 && <div className="space-y-5"><Card><CardHeader><CardTitle>Artigos escolhidos <Badge variant="secondary">{draft.items.length}</Badge></CardTitle></CardHeader><CardContent className="space-y-3">{selectedProducts.length === 0 ? <p className="rounded-xl bg-muted p-5 text-center text-sm text-muted-foreground">Ainda não adicionou artigos.</p> : selectedProducts.map(({ item, product, key }) => <div key={key} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{product.name}</h3>{item.variation && <p className="text-sm font-medium text-primary">{item.variation}</p>}<p className="text-sm text-muted-foreground">{product.unit_label} · mínimo {formatQuantity(product.minimum_quantity)}</p></div><Button variant="ghost" size="sm" onClick={() => removeProduct(key)}><CircleMinus /> Remover</Button></div><div className="mt-4 flex items-center gap-2"><Button variant="outline" size="icon" aria-label="Diminuir" onClick={() => setItem(key, { quantity: Math.max(Number(product.minimum_quantity), Number(item.quantity) - Number(product.quantity_step)) })}><CircleMinus /></Button><Input className="w-28 text-center" type="number" min={product.minimum_quantity} step={product.quantity_step} value={item.quantity} onChange={(event) => setItem(key, { quantity: Number(event.target.value) })} /><span className="text-sm text-muted-foreground">{product.unit_label}</span><Button variant="outline" size="icon" aria-label="Aumentar" onClick={() => setItem(key, { quantity: Number(item.quantity) + Number(product.quantity_step) })}><CirclePlus /></Button></div><Textarea className="mt-3 min-h-20" value={item.note} onChange={(event) => setItem(key, { note: event.target.value })} placeholder={product.requires_note ? "Observação obrigatória" : "Observação do artigo (opcional)"} /></div>)}</CardContent></Card><Card><CardHeader><CardTitle>Adicionar ao pedido</CardTitle></CardHeader><CardContent className="space-y-5">{categories.map((category) => <section key={category.name}><h3 className="mb-2 text-sm font-semibold text-muted-foreground">{category.name}</h3><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{productChoices.filter(({ product, key }) => (product.category?.name || "Outros") === category.name && !draft.items.some((item) => itemKey(item.product_id, item.variation || "") === key)).map(({ product, variation, key }) => <Button key={key} variant="outline" className="h-auto min-h-16 justify-start whitespace-normal py-3 text-left" onClick={() => addProduct(product, variation)}><PackagePlus className="shrink-0" /><span><span className="block">{product.name}</span>{variation && <span className="block text-sm font-medium text-primary">{variation}</span>}<span className="block text-xs font-normal text-muted-foreground">{product.description || product.unit_label}</span></span></Button>)}</div></section>)}</CardContent></Card></div>}
+    {step === 2 && <div className="space-y-5"><Card><CardHeader><CardTitle>Artigos escolhidos <Badge variant="secondary">{draft.items.length}</Badge></CardTitle></CardHeader><CardContent className="space-y-3">{selectedProducts.length === 0 ? <p className="rounded-xl bg-muted p-5 text-center text-sm text-muted-foreground">Ainda não adicionou artigos.</p> : selectedProducts.map(({ item, product, key }) => <div key={key} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{product.name}</h3>{item.variation && <p className="text-sm font-medium text-primary">{item.variation}</p>}<p className="text-sm text-muted-foreground">{product.quantity_mode === "selection" ? "Escolha por opção" : `${product.unit_label} · mínimo ${formatQuantity(product.minimum_quantity)}`}</p></div><Button variant="ghost" size="sm" onClick={() => removeProduct(key)}><CircleMinus /> Remover</Button></div><div className="mt-4 flex items-center gap-2"><Button variant="outline" size="icon" aria-label="Diminuir" onClick={() => setItemQuantity(key, item, product, Math.max(Number(product.minimum_quantity), Number(item.quantity) - Number(product.quantity_step)))}><CircleMinus /></Button><Input className="w-28 text-center" type="number" min={product.minimum_quantity} step={product.quantity_mode === "unit_weight" ? 1 : product.quantity_step} value={item.quantity} onChange={(event) => setItemQuantity(key, item, product, Number(event.target.value))} /><span className="text-sm text-muted-foreground">{product.unit_label}</span><Button variant="outline" size="icon" aria-label="Aumentar" onClick={() => setItemQuantity(key, item, product, Number(item.quantity) + Number(product.quantity_step))}><CirclePlus /></Button></div>{product.quantity_mode === "unit_weight" && <div className="mt-4 grid gap-3 sm:grid-cols-2"><p className="text-sm font-medium sm:col-span-2">Peso de cada unidade</p>{item.unit_weights.map((weight, index) => <Field key={index} id={`weight-${key}-${index}`} label={`Unidade ${index + 1} (${product.unit_weight_label})`} required><Input id={`weight-${key}-${index}`} type="number" min="0.001" step="0.001" value={weight || ""} onChange={(event) => setItem(key, { unit_weights: item.unit_weights.map((entry, weightIndex) => weightIndex === index ? Number(event.target.value) : entry) })} /></Field>)}</div>}<Textarea className="mt-3 min-h-20" value={item.note} onChange={(event) => setItem(key, { note: event.target.value })} placeholder={product.requires_note ? "Observação obrigatória" : "Observação do artigo (opcional)"} /></div>)}</CardContent></Card><Card><CardHeader><CardTitle>Adicionar ao pedido</CardTitle></CardHeader><CardContent className="space-y-5">{categories.map((category) => <section key={category.name}><h3 className="mb-2 text-sm font-semibold text-muted-foreground">{category.name}</h3><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{productChoices.filter(({ product, key }) => (product.category?.name || "Outros") === category.name && !draft.items.some((item) => itemKey(item.product_id, item.variation || "") === key)).map(({ product, variation, key }) => <Button key={key} variant="outline" className="h-auto min-h-16 justify-start whitespace-normal py-3 text-left" onClick={() => addProduct(product, variation)}><PackagePlus className="shrink-0" /><span><span className="block">{product.name}</span>{variation && <span className="block text-sm font-medium text-primary">{variation}</span>}<span className="block text-xs font-normal text-muted-foreground">{product.description || (product.quantity_mode === "unit_weight" ? `Peso por ${product.unit_label}` : product.unit_label)}</span></span></Button>)}</div></section>)}</CardContent></Card></div>}
 
-    {step === 3 && <div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader><CardTitle>Cliente</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><Review label="Nome" value={draft.customer_name} /><Review label="Email" value={draft.customer_email || "—"} /><Review label="Telefone" value={draft.customer_phone || "—"} /><Review label="Levantamento" value={`${locations.find((location) => location.id === draft.pickup_store_id)?.name || "—"} · ${draft.pickup_at ? formatDateTime(draft.pickup_at) : "—"}`} /><Review label="Observações" value={draft.general_notes || "—"} /></CardContent></Card><Card><CardHeader><CardTitle>Artigos</CardTitle></CardHeader><CardContent className="space-y-3">{selectedProducts.map(({ item, product, key }) => <div key={key} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0"><div><p className="font-medium">{product.name}{item.variation ? ` · ${item.variation}` : ""}</p>{item.note && <p className="text-sm text-muted-foreground">{item.note}</p>}</div><p className="shrink-0 font-semibold">{formatQuantity(item.quantity)} {product.unit_label}</p></div>)}</CardContent></Card></div>}
+    {step === 3 && <div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader><CardTitle>Cliente</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><Review label="Nome" value={draft.customer_name} /><Review label="Email" value={draft.customer_email || "—"} /><Review label="Telefone" value={draft.customer_phone || "—"} /><Review label="Levantamento" value={`${locations.find((location) => location.id === draft.pickup_store_id)?.name || "—"} · ${draft.pickup_at ? formatDateTime(draft.pickup_at) : "—"}`} /><Review label="Observações" value={draft.general_notes || "—"} /></CardContent></Card><Card><CardHeader><CardTitle>Artigos</CardTitle></CardHeader><CardContent className="space-y-3">{selectedProducts.map(({ item, product, key }) => <div key={key} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0"><div><p className="font-medium">{product.name}{item.variation ? ` · ${item.variation}` : ""}</p>{item.note && <p className="text-sm text-muted-foreground">{item.note}</p>}</div><p className="shrink-0 text-right font-semibold">{formatItemQuantity({ ...item, unit_label: product.unit_label, unit_weight_label: product.unit_weight_label })}</p></div>)}</CardContent></Card></div>}
 
     <div className="sticky bottom-20 z-20 flex justify-between gap-3 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur md:bottom-4"><Button variant="outline" disabled={step === 1 || pending} onClick={() => setStep((value) => value - 1)}><ChevronLeft /> Anterior</Button>{step < 3 ? <Button onClick={next}>Continuar <ChevronRight /></Button> : <Button size="lg" disabled={pending || !online} onClick={submit}>{pending ? <LoaderCircle className="animate-spin" /> : <Send />}{orderId ? "Enviar revisão" : "Enviar à cozinha"}</Button>}</div>
   </div>;
