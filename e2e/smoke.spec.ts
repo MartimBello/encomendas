@@ -37,9 +37,11 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
   await expect(admin).toHaveURL(/\/admin/);
   await expect(admin.getByRole("heading", { name: "Administração" })).toBeVisible();
   await admin.goto("/admin/definicoes");
-  await expect(admin.getByRole("heading", { name: "Definições" })).toBeVisible();
-  await expect(admin.getByRole("tab", { name: "Regras de encomenda" })).toHaveAttribute("aria-selected", "true");
-  await admin.getByRole("tab", { name: "Locais", exact: true }).click();
+  await expect(admin).toHaveURL(/\/admin\/definicoes\/regras$/);
+  await expect(admin.getByRole("heading", { name: "Regras de encomenda" })).toBeVisible();
+  await expect(admin.getByRole("link", { name: "Definições", exact: true })).toBeVisible();
+  await admin.getByRole("link", { name: "Locais", exact: true }).click();
+  await expect(admin).toHaveURL(/\/admin\/definicoes\/locais$/);
   await expect(admin.getByRole("heading", { name: "Locais e horários" })).toBeVisible();
   const monday = admin.getByRole("checkbox", { name: "Segunda" });
   const tuesday = admin.getByRole("checkbox", { name: "Terça" });
@@ -48,7 +50,8 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
   await expect(monday).toBeChecked();
   await expect(tuesday).toBeChecked();
   await expect(admin.getByLabel("Abertura: hora")).toBeVisible();
-  await admin.getByRole("tab", { name: "Retenção de dados" }).click();
+  await admin.getByRole("link", { name: "Retenção de dados" }).click();
+  await expect(admin).toHaveURL(/\/admin\/definicoes\/retencao$/);
   await expect(admin.getByLabel("Retenção de dados (meses)")).toHaveValue("24");
   await admin.close();
 });
@@ -114,7 +117,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(admin.getByText("Peru assado", { exact: true })).toBeVisible();
 
   await admin.getByLabel("Nome do artigo").fill(productName);
-  await admin.getByLabel("Unidade").fill("un.");
+  await admin.getByLabel("Unidade (quantidade normal)", { exact: true }).fill("un.");
   await admin.getByRole("button", { name: "Adicionar artigo" }).click();
   await expect(admin.getByText("Artigo adicionado ao menu especial.")).toBeVisible();
   const productRow = admin.getByRole("row", { name: new RegExp(`Artigo ${productName}`) });
@@ -185,6 +188,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await store.getByLabel("Nome do cliente").fill(`Cliente sazonal ${testInfo.project.name}`);
   await store.getByLabel("Telefone").fill("912345678");
   await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
+  await store.getByLabel("Unidade 1 (kg)").fill("4");
   await store.getByLabel(/^Observação/).fill("Bem passado");
   await store.getByRole("button", { name: "Enviar encomenda sazonal" }).click();
   await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
@@ -195,6 +199,8 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store.getByRole("heading", { name: /Editar (ENC|SAZ)-/ })).toBeVisible();
   await expect(store.getByLabel("Email (opcional)")).toHaveValue("");
   await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
+  await expect(store.getByLabel("Unidade 1 (kg)")).toHaveValue("4");
+  await store.getByLabel("Unidade 2 (kg)").fill("3");
   await store.getByRole("button", { name: "Guardar alterações" }).click();
   await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
   await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
@@ -230,6 +236,7 @@ test("store creation, kitchen acceptance and cancellation acknowledgment", async
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("button", { name: "Enviar à cozinha" }).click();
   await expect(page).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/, { timeout: 15_000 });
+  await expect(page.evaluate(() => sessionStorage.getItem("encomendas:draft:new"))).resolves.toBeNull();
 
   const orderId = page.url().split("/").pop()!;
   const orderNumber = (await page.getByRole("heading", { level: 1 }).textContent())!;

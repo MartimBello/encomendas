@@ -99,14 +99,14 @@ isOneToOne: false
                   ]
                 },"order_items": {
                   Row: {
-                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id": string | null,"unit_label": string,"variation_name": string
+                    "id": string,"item_note": string,"position": number,"product_id": string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id": string | null,"unit_label": string,"unit_weight_label": string,"unit_weights": number[],"variation_name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id"?: string | null,"unit_label": string,"variation_name"?: string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name": string,"quantity": number,"revision_id": string,"seasonal_product_id"?: string | null,"unit_label": string,"unit_weight_label"?: string,"unit_weights"?: number[],"variation_name"?: string
                   }
                   Update: {
-                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"seasonal_product_id"?: string | null,"unit_label"?: string,"variation_name"?: string
+                    "id"?: string,"item_note"?: string,"position"?: number,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"revision_id"?: string,"seasonal_product_id"?: string | null,"unit_label"?: string,"unit_weight_label"?: string,"unit_weights"?: number[],"variation_name"?: string
                   }
                   Relationships: [
                     {
@@ -249,14 +249,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"unit_label": string,"updated_at": string,"variations": (string)[]
+                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"unit_label": string,"unit_weight_label": string,"updated_at": string,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Relationships: [
                     {
@@ -343,14 +343,14 @@ isOneToOne: false
                   ]
                 },"seasonal_products": {
                   Row: {
-                    "active": boolean,"campaign_id": string,"category_id": string | null,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"updated_at": string,"variations": (string)[]
+                    "active": boolean,"campaign_id": string,"category_id": string | null,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"unit_weight_label": string,"updated_at": string,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"campaign_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"campaign_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"campaign_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"campaign_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
                   }
                   Relationships: [
                     {
@@ -454,7 +454,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "app_role": "admin"|"store"|"kitchen","delivery_status": "pending"|"processing"|"sent"|"failed"|"dead","location_type": "store"|"kitchen","notification_channel": "email"|"push","notification_kind": "new_order"|"revised_order"|"order_accepted"|"order_updated_accepted"|"order_rejected"|"order_cancelled"|"accepted_order_cancelled","order_event_type": "created"|"revised"|"accepted"|"rejected"|"cancelled"|"cancellation_acknowledged","order_status": "pending"|"accepted"|"rejected"|"cancelled"
+            "app_role": "admin"|"store"|"kitchen","delivery_status": "pending"|"processing"|"sent"|"failed"|"dead","location_type": "store"|"kitchen","notification_channel": "email"|"push","notification_kind": "new_order"|"revised_order"|"order_accepted"|"order_updated_accepted"|"order_rejected"|"order_cancelled"|"accepted_order_cancelled","order_event_type": "created"|"revised"|"accepted"|"rejected"|"cancelled"|"cancellation_acknowledged","order_status": "pending"|"accepted"|"rejected"|"cancelled","product_quantity_mode": "standard"|"selection"|"unit_weight"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -574,7 +574,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["admin", "store", "kitchen"],"delivery_status": ["pending", "processing", "sent", "failed", "dead"],"location_type": ["store", "kitchen"],"notification_channel": ["email", "push"],"notification_kind": ["new_order", "revised_order", "order_accepted", "order_updated_accepted", "order_rejected", "order_cancelled", "accepted_order_cancelled"],"order_event_type": ["created", "revised", "accepted", "rejected", "cancelled", "cancellation_acknowledged"],"order_status": ["pending", "accepted", "rejected", "cancelled"]
+            "app_role": ["admin", "store", "kitchen"],"delivery_status": ["pending", "processing", "sent", "failed", "dead"],"location_type": ["store", "kitchen"],"notification_channel": ["email", "push"],"notification_kind": ["new_order", "revised_order", "order_accepted", "order_updated_accepted", "order_rejected", "order_cancelled", "accepted_order_cancelled"],"order_event_type": ["created", "revised", "accepted", "rejected", "cancelled", "cancellation_acknowledged"],"order_status": ["pending", "accepted", "rejected", "cancelled"],"product_quantity_mode": ["standard", "selection", "unit_weight"]
           }
         }
 } as const

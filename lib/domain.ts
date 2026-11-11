@@ -18,6 +18,7 @@ export type NotificationKind =
   | "order_cancelled"
   | "accepted_order_cancelled";
 export type DeliveryStatus = "pending" | "processing" | "sent" | "failed" | "dead";
+export type ProductQuantityMode = "standard" | "selection" | "unit_weight";
 
 export interface Profile {
   id: string;
@@ -44,6 +45,8 @@ export interface Product {
   unit_label: string;
   minimum_quantity: number;
   quantity_step: number;
+  quantity_mode: ProductQuantityMode;
+  unit_weight_label: string;
   variations: string[];
   requires_note: boolean;
   active: boolean;
@@ -98,6 +101,8 @@ export interface SeasonalProduct {
   unit_label: string;
   minimum_quantity: number;
   quantity_step: number;
+  quantity_mode: ProductQuantityMode;
+  unit_weight_label: string;
   variations: string[];
   stock_limit: number | null;
   requires_note: boolean;
@@ -126,6 +131,8 @@ export interface OrderItem {
   variation_name?: string;
   unit_label?: string;
   quantity: number;
+  unit_weights?: number[];
+  unit_weight_label?: string;
   item_note?: string;
   note?: string;
   position?: number;

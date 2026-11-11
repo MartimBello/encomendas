@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Order } from "@/lib/domain";
 import { formatDateTime } from "@/lib/dates";
-import { cn, formatProductName, formatQuantity } from "@/lib/utils";
+import { cn, formatItemQuantity, formatProductName } from "@/lib/utils";
 import { PrintControls } from "@/components/print-controls";
 
 export function PrintOrder({
@@ -76,7 +76,7 @@ export function PrintOrder({
                 {item.item_note && <p className="mt-1 text-sm">Nota: {item.item_note}</p>}
               </div>
               <p className="shrink-0 text-lg font-black">
-                {formatQuantity(item.quantity)} {item.unit_label}
+                {formatItemQuantity(item)}
               </p>
             </div>
           ))}

@@ -213,11 +213,13 @@ export function ProductForm({ categories }: { categories: { id: string; name: st
       <Field><FieldLabel htmlFor="product-category">Categoria</FieldLabel><NativeSelect id="product-category" name="category_id" defaultValue={categories[0]?.id} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></Field>
       <Field><FieldLabel htmlFor="product-name">Nome</FieldLabel><Input id="product-name" name="name" placeholder="Nome do artigo" required /></Field>
       <Field><FieldLabel htmlFor="product-description">Descrição</FieldLabel><Input id="product-description" name="description" placeholder="Descrição" /></Field>
-      <Field><FieldLabel htmlFor="product-unit">Unidade</FieldLabel><Input id="product-unit" name="unit_label" placeholder="kg, tab., dose…" required /></Field>
+      <Field><FieldLabel htmlFor="product-unit">Unidade (quantidade normal)</FieldLabel><Input id="product-unit" name="unit_label" defaultValue="un." placeholder="kg, tab., dose…" required /></Field>
+      <Field><FieldLabel htmlFor="product-quantity-mode">Forma de escolha</FieldLabel><NativeSelect id="product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
+      <Field><FieldLabel htmlFor="product-weight-unit">Unidade do peso individual</FieldLabel><Input id="product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></Field>
       <Field><FieldLabel htmlFor="product-minimum">Quantidade mínima</FieldLabel><Input id="product-minimum" name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
       <Field><FieldLabel htmlFor="product-step">Incremento</FieldLabel><Input id="product-step" name="quantity_step" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
       <Field><FieldLabel htmlFor="product-position">Posição na categoria</FieldLabel><Input id="product-position" name="position" type="number" min="0" defaultValue="0" required /></Field>
-      <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor="product-variations">Variações (opcional, uma por linha)</FieldLabel><Textarea id="product-variations" name="variations" placeholder={"Com recheio\nSem recheio"} /></Field>
+      <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor="product-variations">Opções / variações (uma por linha)</FieldLabel><Textarea id="product-variations" name="variations" placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></Field>
       <Field orientation="horizontal"><Switch id="requires-note" name="requires_note" /><FieldLabel htmlFor="requires-note">Observação obrigatória</FieldLabel></Field>
       <Field className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="w-fit" disabled={pending || !categories.length}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar artigo</Button></Field>
     </FieldGroup>
@@ -242,6 +244,8 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
       unit_label: product.unit_label,
       minimum_quantity: product.minimum_quantity,
       quantity_step: product.quantity_step,
+      quantity_mode: product.quantity_mode,
+      unit_weight_label: product.unit_weight_label,
       position: product.position,
       variations: product.variations.join("\n"),
       requires_note: product.requires_note,
@@ -257,11 +261,13 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
           <Field><FieldLabel htmlFor={`${fieldId}-category`}>Categoria</FieldLabel><NativeSelect id={`${fieldId}-category`} name="category_id" defaultValue={product.category_id} required>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-name`}>Nome</FieldLabel><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-description`}>Descrição</FieldLabel><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></Field>
-          <Field><FieldLabel htmlFor={`${fieldId}-unit`}>Unidade</FieldLabel><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</FieldLabel><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</FieldLabel><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</FieldLabel><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-minimum`}>Quantidade mínima</FieldLabel><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-step`}>Incremento</FieldLabel><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-position`}>Posição na categoria</FieldLabel><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></Field>
-          <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor={`${fieldId}-variations`}>Variações (opcional, uma por linha)</FieldLabel><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></Field>
+          <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor={`${fieldId}-variations`}>Opções / variações (uma por linha)</FieldLabel><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></Field>
           <Field orientation="horizontal"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><FieldLabel htmlFor={`${fieldId}-requires-note`}>Observação obrigatória</FieldLabel></Field>
           {error && <FieldError className="sm:col-span-2 lg:col-span-3">{error}</FieldError>}
           <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>

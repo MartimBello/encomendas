@@ -150,9 +150,11 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
       <Input id="season-product-description" name="description" placeholder="Descrição" />
     </div>
     <div className="flex flex-col gap-2">
-      <Label htmlFor="season-product-unit">Unidade</Label>
-      <Input id="season-product-unit" name="unit_label" placeholder="kg, dose…" required />
+      <Label htmlFor="season-product-unit">Unidade (quantidade normal)</Label>
+      <Input id="season-product-unit" name="unit_label" defaultValue="un." placeholder="kg, dose…" required />
     </div>
+    <div className="flex flex-col gap-2"><Label htmlFor="season-product-quantity-mode">Forma de escolha</Label><NativeSelect id="season-product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
+    <div className="flex flex-col gap-2"><Label htmlFor="season-product-weight-unit">Unidade do peso individual</Label><Input id="season-product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></div>
     <div className="flex flex-col gap-2">
       <Label htmlFor="season-product-minimum">Quantidade mínima</Label>
       <Input id="season-product-minimum" name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue="1" required />
@@ -169,7 +171,7 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
       <Label htmlFor="season-product-stock">Limite de stock</Label>
       <Input id="season-product-stock" name="stock_limit" type="number" min="0.001" step="0.001" placeholder="Sem limite" />
     </div>
-    <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4"><Label htmlFor="season-product-variations">Variações (opcional, uma por linha)</Label><Textarea id="season-product-variations" name="variations" placeholder={"Com recheio\nSem recheio"} /></div>
+    <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4"><Label htmlFor="season-product-variations">Opções / variações (uma por linha)</Label><Textarea id="season-product-variations" name="variations" placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></div>
     <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id="season-requires-note" name="requires_note" /><Label htmlFor="season-requires-note">Nota obrigatória</Label></div>
     <div className="sm:col-span-2 lg:col-span-4"><Message state={state} /><Button className="mt-2" disabled={pending || !categories.length}><Plus />Adicionar artigo</Button></div>
   </form>;
@@ -193,6 +195,8 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
       unit_label: product.unit_label,
       minimum_quantity: product.minimum_quantity,
       quantity_step: product.quantity_step,
+      quantity_mode: product.quantity_mode,
+      unit_weight_label: product.unit_weight_label,
       position: product.position,
       stock_limit: product.stock_limit ?? "",
       variations: product.variations.join("\n"),
@@ -208,12 +212,14 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-category`}>Categoria</Label><NativeSelect id={`${fieldId}-category`} name="category_id" defaultValue={product.category_id ?? ""} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-description`}>Descrição</Label><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></div>
-        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-unit`}>Unidade</Label><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</Label><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</Label><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</Label><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-minimum`}>Quantidade mínima</Label><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-step`}>Incremento</Label><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-position`}>Posição no menu</Label><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-stock`}>Limite de stock</Label><Input id={`${fieldId}-stock`} name="stock_limit" type="number" min="0.001" step="0.001" defaultValue={product.stock_limit ?? ""} placeholder="Sem limite" /></div>
-        <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${fieldId}-variations`}>Variações (uma por linha)</Label><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Com recheio\nSem recheio"} /></div>
+        <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${fieldId}-variations`}>Opções / variações (uma por linha)</Label><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></div>
         <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><Label htmlFor={`${fieldId}-requires-note`}>Nota obrigatória</Label></div>
         <div className="sm:col-span-2 lg:col-span-3"><Message state={{ ok: false, message: error }} /></div>
         <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
