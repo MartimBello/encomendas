@@ -43,13 +43,14 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Cliente e levantamento</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Cliente e receção</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="font-semibold">{revision.customer_name}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><Mail className="size-4" />{revision.customer_email || "Não indicado"}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><Phone className="size-4" />{revision.customer_phone || "—"}</p>
-          <p className="flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{formatDateTime(revision.pickup_at)}</p>
-          <p className="flex items-center gap-2 text-muted-foreground"><MapPin className="size-4" />{order.pickup_store?.name}</p>
+          <p className="flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}: {formatDateTime(revision.pickup_at)}</p>
+          <p className="flex items-center gap-2 text-muted-foreground"><MapPin className="size-4" />{revision.fulfillment_type === "delivery" ? revision.delivery_address : order.pickup_store?.name}</p>
+          {revision.fulfillment_type === "delivery" && <p className="flex items-center gap-2 text-muted-foreground"><Store className="size-4" />Loja responsável: {order.pickup_store?.name}</p>}
           <p className="flex items-center gap-2 text-muted-foreground"><Store className="size-4" />Origem: {order.ordering_store?.name}</p>
         </CardContent>
       </Card>
@@ -66,7 +67,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
               </div>
               <dl className="grid gap-2 text-sm">
                 <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd>{entry.customer_name || "Dados removidos"}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Levantamento</dt><dd>{formatDateTime(entry.pickup_at)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">{entry.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}</dt><dd>{formatDateTime(entry.pickup_at)}{entry.fulfillment_type === "delivery" && entry.delivery_address ? ` · ${entry.delivery_address}` : ""}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Artigos</dt><dd>{entry.items?.map((item) => `${formatItemQuantity(item)} ${formatProductName(item.product_name, item.variation_name)}`).join(" · ")}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Observações</dt><dd>{entry.general_notes || "—"}</dd></div>
               </dl>

@@ -10,8 +10,8 @@ select has_column('public', 'seasonal_products', 'category_id', 'seasonal produc
 select has_column('public', 'seasonal_products', 'variations', 'seasonal products can define variations');
 select has_column('public', 'order_items', 'seasonal_product_id', 'seasonal snapshots retain their stock identity');
 select has_column('public', 'order_items', 'variation_name', 'order lines snapshot their variation');
-select has_function('public', 'create_seasonal_order', array['uuid','uuid','text','text','text','uuid','timestamp with time zone','text','jsonb','uuid'], 'seasonal order RPC exists');
-select has_function('public', 'submit_seasonal_order_revision', array['uuid','text','text','text','uuid','timestamp with time zone','text','jsonb'], 'seasonal revision RPC exists');
+select has_function('public', 'create_seasonal_order', array['uuid','uuid','text','text','text','uuid','timestamp with time zone','text','jsonb','text','text','uuid'], 'seasonal order RPC exists');
+select has_function('public', 'submit_seasonal_order_revision', array['uuid','text','text','text','uuid','timestamp with time zone','text','jsonb','text','text'], 'seasonal revision RPC exists');
 
 insert into public.seasonal_campaigns (id, name, slug, description, ordering_opens_at, ordering_closes_at, active)
 values ('49000000-0000-4000-8000-000000000001', 'Natal teste', 'natal-teste', 'Menu de teste', now() - interval '1 day', now() + interval '1 day', true);
@@ -26,7 +26,7 @@ select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440201', '49000000-0000-4000-8000-000000000001',
     'Cliente Sazonal', 'sazonal@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2,"note":""}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2,"note":""}]'::jsonb, 'pickup', null, null
   ) $$,
   'P0001', 'Um ou mais artigos sazonais são inválidos ou estão indisponíveis.',
   'mandatory seasonal item notes are enforced'
@@ -36,7 +36,7 @@ select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440207', '49000000-0000-4000-8000-000000000001',
     'Cliente Sazonal', 'sazonal@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","quantity":2,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","quantity":2,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
   'P0001', 'Um ou mais artigos sazonais são inválidos ou estão indisponíveis.',
   'a variation is required when the seasonal product defines choices'
@@ -46,7 +46,7 @@ select lives_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440202', '49000000-0000-4000-8000-000000000001',
     'Cliente Sazonal', 'sazonal@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', 'Encomenda de Natal',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
   'store can create a seasonal order during its acceptance period'
 );
@@ -66,7 +66,7 @@ select is(
   public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440202', '49000000-0000-4000-8000-000000000001',
     'Cliente Sazonal', 'sazonal@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', 'Encomenda de Natal',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ),
   (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440202'),
   'seasonal creation is idempotent'
@@ -76,7 +76,7 @@ select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440205', '49000000-0000-4000-8000-000000000001',
     'Cliente Sem Stock', 'sem-stock@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
   'P0001', 'Stock insuficiente para um ou mais artigos sazonais.',
   'automatically accepted seasonal orders reserve stock'
@@ -91,7 +91,7 @@ select lives_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440206', '49000000-0000-4000-8000-000000000001',
     'Cliente Com Stock', 'com-stock@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
   'cancelled seasonal orders release stock'
 );
@@ -103,7 +103,8 @@ select lives_ok(
     '49200000-0000-4000-8000-000000000001',
     (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:30') at time zone 'Europe/Lisbon',
     'Versão revista',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb,
+    'pickup', null
   ) $$,
   'store can revise a seasonal order with its campaign menu'
 );
@@ -116,9 +117,9 @@ select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440204', '49000000-0000-4000-8000-000000000001',
     'Cliente Fora de Horas', 'horas@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '18:30') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
-  'P0001', 'Escolha um horário de levantamento disponível.',
+  'P0001', 'Escolha um horário disponível.',
   'pickup must be inside the configured store opening range'
 );
 
@@ -128,7 +129,8 @@ select throws_ok(
     'Cliente Sazonal', 'sazonal@example.pt', '912345678',
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
-    '', '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb
+    '', '[{"product_id":"30000000-0000-4000-8000-000000000001","quantity":1,"note":""}]'::jsonb,
+    'pickup', null
   ) $$,
   'P0001', 'Use a edição própria da campanha sazonal.',
   'regular catalog revisions cannot replace a seasonal menu'
@@ -139,7 +141,7 @@ select throws_ok(
   $$ select public.create_seasonal_order(
     '550e8400-e29b-41d4-a716-446655440203', '49000000-0000-4000-8000-000000000001',
     'Cliente Tardio', 'tardio@example.pt', '912345678', '49200000-0000-4000-8000-000000000001', (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:00') at time zone 'Europe/Lisbon', '',
-    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, null
+    '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb, 'pickup', null, null
   ) $$,
   'P0001', 'Esta campanha não está a aceitar encomendas.',
   'closed campaigns reject new orders'

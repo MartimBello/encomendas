@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
+export const SelectGroup = SelectPrimitive.Group;
 
 export function SelectTrigger({ className, children, ...props }: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
   return <SelectPrimitive.Trigger className={cn("flex h-12 w-full items-center justify-between rounded-xl border border-input bg-background px-3 text-left text-base outline-none focus:ring-3 focus:ring-primary/15 disabled:opacity-50", className)} {...props}>{children}<SelectPrimitive.Icon><ChevronDown className="size-4 opacity-60" /></SelectPrimitive.Icon></SelectPrimitive.Trigger>;
