@@ -11,6 +11,17 @@ export const orderItemSchema = z.object({
   note: z.string().trim().max(500).default(""),
 });
 
+const fulfillmentFields = {
+  fulfillment_type: z.enum(["pickup", "delivery"]).default("pickup"),
+  delivery_address: z.string().trim().max(500).default(""),
+};
+
+function requireDeliveryAddress(value: { fulfillment_type: "pickup" | "delivery"; delivery_address: string }, context: z.RefinementCtx) {
+  if (value.fulfillment_type === "delivery" && value.delivery_address.length < 5) {
+    context.addIssue({ code: "custom", path: ["delivery_address"], message: "Indique a morada de entrega." });
+  }
+}
+
 export const orderPayloadSchema = z.object({
   idempotency_key: databaseUuid,
   order_id: databaseUuid.optional(),
@@ -20,9 +31,10 @@ export const orderPayloadSchema = z.object({
   customer_phone: z.string().trim().max(40).default(""),
   pickup_store_id: databaseUuid,
   pickup_at: z.iso.datetime({ offset: true }),
+  ...fulfillmentFields,
   general_notes: z.string().trim().max(2000).default(""),
   items: z.array(orderItemSchema).min(1, "Adicione pelo menos um artigo.").max(100),
-});
+}).superRefine(requireDeliveryAddress);
 
 export const seasonalOrderPayloadSchema = z.object({
   idempotency_key: databaseUuid,
@@ -34,9 +46,10 @@ export const seasonalOrderPayloadSchema = z.object({
   customer_phone: z.string().trim().max(40).default(""),
   pickup_slot_id: databaseUuid,
   pickup_at: z.iso.datetime({ offset: true }),
+  ...fulfillmentFields,
   general_notes: z.string().trim().max(2000).default(""),
   items: z.array(orderItemSchema).min(1, "Adicione pelo menos um artigo.").max(100),
-});
+}).superRefine(requireDeliveryAddress);
 
 export const settingsSchema = z.object({
   phone_required: z.boolean(),

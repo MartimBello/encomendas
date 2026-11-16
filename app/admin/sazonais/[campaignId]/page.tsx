@@ -8,6 +8,7 @@ import type { Location } from "@/lib/domain";
 import { createClient } from "@/lib/supabase/server";
 import { formatQuantity } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SeasonalExportPanel } from "@/components/seasonal-export-panel";
 import { SeasonalCampaignEditForm, SeasonalDeleteButton, SeasonalPickupSlotEditForm, SeasonalPickupSlotForm, SeasonalProductEditForm, SeasonalProductForm, SeasonalToggleButton } from "@/components/seasonal-admin-forms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,8 @@ export default async function SeasonalCampaignPage({ params }: { params: Promise
           </Table>
         </CardContent>
       </Card>
+
+      <SeasonalExportPanel campaign={campaign} />
     </div>
   </>;
 }

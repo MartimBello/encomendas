@@ -8,7 +8,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { createSeasonalOrderAction, reviseSeasonalOrderAction } from "@/app/orders/actions";
-import type { OrderRevision, OrderingSettings, SeasonalCampaign } from "@/lib/domain";
+import type { FulfillmentType, OrderRevision, OrderingSettings, SeasonalCampaign } from "@/lib/domain";
 import { APP_TIME_ZONE } from "@/lib/dates";
 import { formatQuantity } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FulfillmentFields } from "@/components/fulfillment-fields";
 
 type SelectedItem = { quantity: number; unit_weights: number[]; note: string };
 
@@ -43,8 +44,11 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
   const initialWindow = slots.find((slot) => slot.pickup_date === initialDateKey && slot.location_id === initial?.pickup_store_id && initialTime >= slot.opens_at.slice(0, 5) && initialTime < slot.closes_at.slice(0, 5));
   const [items, setItems] = useState<Record<string, SelectedItem>>(() => initialItems(initial));
   const [pickupDate, setPickupDate] = useState<Date | undefined>(() => initialDateKey ? new Date(`${initialDateKey}T12:00:00`) : undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [pickupWindowId, setPickupWindowId] = useState(initialWindow?.id ?? "");
   const [pickupAt, setPickupAt] = useState(initial?.pickup_at ?? "");
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(initial?.fulfillment_type ?? "pickup");
+  const [deliveryAddress, setDeliveryAddress] = useState(initial?.delivery_address ?? "");
   const idempotencyKey = useRef<string | null>(null);
   const selectedDateKey = pickupDate ? format(pickupDate, "yyyy-MM-dd") : "";
   const availableDates = new Set(slots.map((slot) => slot.pickup_date));
@@ -83,23 +87,25 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
         customer_name: String(formData.get("customer_name") ?? ""), customer_email: String(formData.get("customer_email") ?? ""),
         customer_phone: String(formData.get("customer_phone") ?? ""), pickup_slot_id: String(formData.get("pickup_slot_id") ?? ""),
         pickup_at: String(formData.get("pickup_at") ?? ""),
+        fulfillment_type: fulfillmentType, delivery_address: fulfillmentType === "delivery" ? deliveryAddress : "",
         general_notes: String(formData.get("general_notes") ?? ""), items: selected,
       };
       const result = orderId ? await reviseSeasonalOrderAction(payload) : await createSeasonalOrderAction(payload);
       if (!result.ok) { toast.error(result.message); return; }
-      if (!orderId) { setItems({}); setPickupDate(undefined); setPickupWindowId(""); setPickupAt(""); idempotencyKey.current = null; }
+      if (!orderId) { setItems({}); setPickupDate(undefined); setPickupWindowId(""); setPickupAt(""); setFulfillmentType("pickup"); setDeliveryAddress(""); idempotencyKey.current = null; }
       toast.success(result.message); router.push(`/loja/encomendas/${result.data?.orderId}`); router.refresh();
     });
   }
 
   return <form action={submit} className="space-y-5">
-    <Card><CardHeader><CardTitle>Cliente e levantamento</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
+    <Card><CardHeader><CardTitle>Cliente e receção</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
       <div><Label htmlFor="season-customer-name">Nome do cliente *</Label><Input id="season-customer-name" name="customer_name" autoComplete="name" defaultValue={initial?.customer_name ?? ""} required /></div>
       <div><Label htmlFor="season-customer-email">Email (opcional)</Label><Input id="season-customer-email" name="customer_email" type="email" inputMode="email" autoComplete="email" defaultValue={initial?.customer_email ?? ""} /></div>
       <div><Label htmlFor="season-customer-phone">Telefone {settings.phone_required ? "*" : ""}</Label><Input id="season-customer-phone" name="customer_phone" type="tel" inputMode="tel" autoComplete="tel" defaultValue={initial?.customer_phone ?? ""} required={settings.phone_required} /></div>
-      <div><Label>Data de levantamento *</Label><Popover><PopoverTrigger asChild><Button type="button" variant="outline" aria-label="Data de levantamento" className="mt-2 w-full justify-start font-normal"><CalendarDays />{pickupDate ? format(pickupDate, "PPP", { locale: pt }) : "Escolher data"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={pickupDate} onSelect={(date) => { setPickupDate(date); setPickupWindowId(""); setPickupAt(""); }} disabled={(date) => !availableDates.has(format(date, "yyyy-MM-dd"))} /></PopoverContent></Popover></div>
-      <div><Label>Loja de levantamento *</Label><input type="hidden" name="pickup_slot_id" value={pickupWindowId} /><Select value={pickupWindowId} onValueChange={(value) => { setPickupWindowId(value); setPickupAt(""); }} disabled={!pickupDate}><SelectTrigger aria-label="Loja de levantamento" className="mt-2"><SelectValue placeholder="Escolher loja" /></SelectTrigger><SelectContent>{dateWindows.map((slot) => <SelectItem key={slot.id} value={slot.id}>{slot.location?.name} · {slot.opens_at.slice(0, 5)}–{slot.closes_at.slice(0, 5)}</SelectItem>)}</SelectContent></Select></div>
-      <div><Label>Hora de levantamento *</Label><input type="hidden" name="pickup_at" value={pickupAt} /><Select value={pickupAt} onValueChange={setPickupAt} disabled={!selectedWindow}><SelectTrigger aria-label="Hora de levantamento" className="mt-2"><SelectValue placeholder="Escolher hora" /></SelectTrigger><SelectContent>{pickupTimes.map((time) => <SelectItem key={time.value} value={time.value}>{time.label}</SelectItem>)}</SelectContent></Select></div>
+      <FulfillmentFields idPrefix="seasonal-order" type={fulfillmentType} address={deliveryAddress} onTypeChange={(type) => { setFulfillmentType(type); if (type === "pickup") setDeliveryAddress(""); }} onAddressChange={setDeliveryAddress} className="md:col-span-2" />
+      <div><Label>Data de {fulfillmentType === "delivery" ? "entrega" : "levantamento"} *</Label><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><Button type="button" variant="outline" aria-label={`Data de ${fulfillmentType === "delivery" ? "entrega" : "levantamento"}`} className="mt-2 w-full justify-start font-normal"><CalendarDays />{pickupDate ? format(pickupDate, "PPP", { locale: pt }) : "Escolher data"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={pickupDate} onSelect={(date) => { setPickupDate(date); setPickupWindowId(""); setPickupAt(""); if (date) setCalendarOpen(false); }} disabled={(date) => !availableDates.has(format(date, "yyyy-MM-dd"))} /></PopoverContent></Popover></div>
+      <div><Label>{fulfillmentType === "delivery" ? "Loja responsável" : "Loja de levantamento"} *</Label><input type="hidden" name="pickup_slot_id" value={pickupWindowId} /><Select value={pickupWindowId} onValueChange={(value) => { setPickupWindowId(value); setPickupAt(""); }} disabled={!pickupDate}><SelectTrigger aria-label={fulfillmentType === "delivery" ? "Loja responsável" : "Loja de levantamento"} className="mt-2"><SelectValue placeholder="Escolher loja" /></SelectTrigger><SelectContent><SelectGroup>{dateWindows.map((slot) => <SelectItem key={slot.id} value={slot.id}>{slot.location?.name} · {slot.opens_at.slice(0, 5)}–{slot.closes_at.slice(0, 5)}</SelectItem>)}</SelectGroup></SelectContent></Select></div>
+      <div><Label>Hora de {fulfillmentType === "delivery" ? "entrega" : "levantamento"} *</Label><input type="hidden" name="pickup_at" value={pickupAt} /><Select value={pickupAt} onValueChange={setPickupAt} disabled={!selectedWindow}><SelectTrigger aria-label={`Hora de ${fulfillmentType === "delivery" ? "entrega" : "levantamento"}`} className="mt-2"><SelectValue placeholder="Escolher hora" /></SelectTrigger><SelectContent><SelectGroup>{pickupTimes.map((time) => <SelectItem key={time.value} value={time.value}>{time.label}</SelectItem>)}</SelectGroup></SelectContent></Select></div>
     </CardContent></Card>
 
     <Card><CardHeader><CardTitle>Menu especial · {campaign.name}</CardTitle></CardHeader><CardContent className="flex flex-col gap-6">
@@ -118,7 +124,7 @@ export function SeasonalOrderForm({ campaign, settings, orderId, initial }: { ca
     </CardContent></Card>
 
     <Card><CardHeader><CardTitle>Observações gerais</CardTitle></CardHeader><CardContent><Label htmlFor="season-general-notes">Notas {settings.general_notes_required ? "*" : ""}</Label><Textarea id="season-general-notes" name="general_notes" defaultValue={initial?.general_notes ?? ""} required={settings.general_notes_required} maxLength={2000} /></CardContent></Card>
-    <Button size="lg" className="w-full sm:w-auto" disabled={pending || !products.length || !slots.length || !pickupWindowId || !pickupAt}>{pending ? <LoaderCircle className="animate-spin" /> : <Send />}{orderId ? "Guardar alterações" : "Enviar encomenda sazonal"}</Button>
+    <Button size="lg" className="w-full sm:w-auto" disabled={pending || !products.length || !slots.length || !pickupWindowId || !pickupAt || (fulfillmentType === "delivery" && deliveryAddress.trim().length < 5)}>{pending ? <LoaderCircle className="animate-spin" /> : <Send />}{orderId ? "Guardar alterações" : "Enviar encomenda sazonal"}</Button>
   </form>;
 }
 

@@ -8,6 +8,8 @@ const validOrder = {
   customer_phone: "912345678",
   pickup_store_id: "10000000-0000-0000-0000-000000000002",
   pickup_at: "2026-12-10T10:00:00.000Z",
+  fulfillment_type: "pickup",
+  delivery_address: "",
   general_notes: "",
   items: [{ product_id: "30000000-0000-0000-0000-000000000001", quantity: 2, note: "" }],
 };
@@ -21,6 +23,8 @@ describe("order validation", () => {
   it("rejects an invalid customer email", () => expect(orderPayloadSchema.safeParse({ ...validOrder, customer_email: "bad" }).success).toBe(false));
   it("requires at least one item", () => expect(orderPayloadSchema.safeParse({ ...validOrder, items: [] }).success).toBe(false));
   it("rejects non-positive quantities", () => expect(orderPayloadSchema.safeParse({ ...validOrder, items: [{ ...validOrder.items[0], quantity: 0 }] }).success).toBe(false));
+  it("requires an address for home delivery", () => expect(orderPayloadSchema.safeParse({ ...validOrder, fulfillment_type: "delivery", delivery_address: "" }).success).toBe(false));
+  it("accepts home delivery with an address", () => expect(orderPayloadSchema.safeParse({ ...validOrder, fulfillment_type: "delivery", delivery_address: "Rua das Flores, 10, Porto" }).success).toBe(true));
 });
 
 describe("settings validation", () => {

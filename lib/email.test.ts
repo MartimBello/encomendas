@@ -28,4 +28,13 @@ describe("Portuguese order email", () => {
     const rendered = renderOrderEmail("order_accepted", order, revision, [{ product_id: null, product_name: "Peru", unit_label: "un.", quantity: 3, unit_weights: [4, 3, 5], unit_weight_label: "kg" }]);
     expect(rendered.html).toContain("3 un. · 4 kg, 3 kg, 5 kg");
   });
+
+  it("shows the required address for a home delivery", () => {
+    const order = { order_number: "ENC-20261105-00003", pickup_store: { id: "1", name: "Loja Centro", address: "Porto" }, rejection_reason: null } as Order;
+    const revision = { version: 1, customer_name: "Ana", pickup_at: "2026-11-19T10:00:00Z", fulfillment_type: "delivery", delivery_address: "Rua das Flores & 10, Porto", general_notes: "" } as OrderRevision;
+    const rendered = renderOrderEmail("order_accepted", order, revision, []);
+    expect(rendered.html).toContain("Entrega:");
+    expect(rendered.html).toContain("Rua das Flores &amp; 10, Porto");
+    expect(rendered.html).toContain("Loja responsável:");
+  });
 });

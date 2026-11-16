@@ -2,8 +2,8 @@ import Link from "next/link";
 import { CalendarClock, Gift, Plus } from "lucide-react";
 import { getOrders, getSeasonalCampaigns } from "@/lib/data";
 import { formatDateTime } from "@/lib/dates";
+import { OrdersDataTable } from "@/components/orders-data-table";
 import { PageHeader } from "@/components/page-header";
-import { OrderCard } from "@/components/order-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,11 @@ function campaignAvailability(opensAt: string, closesAt: string) {
   return { available: now >= opens && now <= closes, upcoming: now < opens };
 }
 
-export default async function SeasonalOrdersPage() {
-  const [campaigns, orders] = await Promise.all([getSeasonalCampaigns(), getOrders({ kind: "seasonal", limit: 100 })]);
+export default async function SeasonalOrdersPage({ searchParams }: PageProps<"/loja/sazonais">) {
+  const query = await searchParams;
+  const estado = typeof query.estado === "string" ? query.estado : undefined;
+  const q = typeof query.q === "string" ? query.q : undefined;
+  const [campaigns, orders] = await Promise.all([getSeasonalCampaigns(), getOrders({ kind: "seasonal", status: estado, search: q, limit: 250 })]);
   return <>
     <PageHeader title="Encomendas sazonais" description="Menus próprios para Natal, Páscoa e outras épocas, com dias especiais de levantamento." />
     <section className="mb-8 space-y-3"><h2 className="text-xl font-semibold">Campanhas</h2><div className="grid gap-4 lg:grid-cols-2">
@@ -24,6 +27,6 @@ export default async function SeasonalOrdersPage() {
       })}
       {!campaigns.length && <Card><CardContent className="py-10 text-center text-muted-foreground">Não existem campanhas sazonais publicadas.</CardContent></Card>}
     </div></section>
-    <section className="space-y-3"><h2 className="text-xl font-semibold">Histórico sazonal</h2>{orders.length ? <div className="grid gap-4 xl:grid-cols-2">{orders.map((order) => <OrderCard key={order.id} order={order} href={`/loja/encomendas/${order.id}`} />)}</div> : <Card><CardContent className="py-10 text-center text-muted-foreground">Ainda não existem encomendas sazonais.</CardContent></Card>}</section>
+    <section className="flex flex-col gap-3"><h2 className="text-xl font-semibold">Histórico sazonal</h2><OrdersDataTable orders={orders} route="/loja/sazonais" detailRoute="/loja/encomendas" search={q} status={estado} emptyMessage="Ainda não existem encomendas sazonais." /></section>
   </>;
 }

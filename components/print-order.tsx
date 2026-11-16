@@ -58,11 +58,12 @@ export function PrintOrder({
             <strong>Email:</strong> {revision.customer_email || "—"}
           </p>
           <p>
-            <strong>Levantamento:</strong> {formatDateTime(revision.pickup_at)}
+            <strong>{revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}:</strong> {formatDateTime(revision.pickup_at)}
           </p>
           <p>
-            <strong>Loja:</strong> {order.pickup_store?.name} · {order.pickup_store?.address}
+            <strong>{revision.fulfillment_type === "delivery" ? "Morada" : "Loja"}:</strong> {revision.fulfillment_type === "delivery" ? revision.delivery_address : `${order.pickup_store?.name} · ${order.pickup_store?.address}`}
           </p>
+          {revision.fulfillment_type === "delivery" && <p><strong>Loja responsável:</strong> {order.pickup_store?.name}</p>}
           <p>
             <strong>Origem:</strong> {order.ordering_store?.name}
           </p>

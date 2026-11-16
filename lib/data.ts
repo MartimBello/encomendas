@@ -10,15 +10,23 @@ const orderListSelect = `
   ordering_store:locations!orders_ordering_store_id_fkey(id,name,address),
   pickup_store:locations!orders_pickup_store_id_fkey(id,name,address),
   campaign:seasonal_campaigns(id,name,slug),
-  revision:order_revisions!orders_current_revision_fk(id,order_id,version,customer_name,customer_email,customer_phone,pickup_store_id,pickup_at,general_notes,created_at,anonymized_at)
+  revision:order_revisions!orders_current_revision_fk(id,order_id,version,customer_name,customer_email,customer_phone,pickup_store_id,pickup_at,fulfillment_type,delivery_address,general_notes,created_at,anonymized_at)
 `;
 
 export async function getOrders(options?: { status?: string; search?: string; limit?: number; kind?: "regular" | "seasonal" }) {
   const supabase = await createClient();
   if (!supabase) return [] as Order[];
+  const search = options?.search?.trim().replace(/[^\p{L}\p{N}\s#-]/gu, "").slice(0, 120);
+  let matchingOrderIds: string[] | undefined;
+  if (search) {
+    const { data: matches, error: searchError } = await supabase.rpc("search_orders", { p_query: search });
+    if (searchError) throw searchError;
+    matchingOrderIds = matches.map((match) => match.order_id);
+    if (!matchingOrderIds.length) return [] as Order[];
+  }
   let query = supabase.from("orders").select(orderListSelect).order("updated_at", { ascending: false }).limit(options?.limit ?? 100);
   if (options?.status && options.status !== "all") query = query.eq("status", options.status as OrderStatus);
-  if (options?.search) query = query.ilike("order_number", `%${options.search.replace(/[%_,()]/g, "")}%`);
+  if (matchingOrderIds) query = query.in("id", matchingOrderIds);
   if (options?.kind === "regular") query = query.is("campaign_id", null);
   if (options?.kind === "seasonal") query = query.not("campaign_id", "is", null);
   const { data, error } = await query;
@@ -29,6 +37,40 @@ export async function getOrders(options?: { status?: string; search?: string; li
     const { data: items } = await supabase.from("order_items").select("*").in("revision_id", revisionIds).order("position");
     for (const order of orders) if (order.revision) order.revision.items = (items ?? []).filter((item) => item.revision_id === order.revision?.id);
   }
+  return orders;
+}
+
+export async function getSeasonalExportOrders(campaignId: string) {
+  const supabase = await createClient();
+  if (!supabase) return [] as Order[];
+  const orders: Order[] = [];
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(orderListSelect)
+      .eq("campaign_id", campaignId)
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as Order[];
+    orders.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  const revisionIds = orders.map((order) => order.revision?.id).filter((id): id is string => Boolean(id));
+  for (let index = 0; index < revisionIds.length; index += 40) {
+    const ids = revisionIds.slice(index, index + 40);
+    const { data: items, error } = await supabase.from("order_items").select("*").in("revision_id", ids).order("position");
+    if (error) throw error;
+    for (const order of orders) {
+      if (order.revision && ids.includes(order.revision.id)) {
+        order.revision.items = (items ?? []).filter((item) => item.revision_id === order.revision?.id);
+      }
+    }
+  }
+
   return orders;
 }
 

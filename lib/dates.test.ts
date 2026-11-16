@@ -17,6 +17,12 @@ describe("pickup slot generation", () => {
     expect(slots.every((slot) => slot.locationId === "porto")).toBe(true);
     expect(slots[0].label).toContain("11:30");
   });
+
+  it("always offers regular-order times in 30-minute intervals", () => {
+    const windows: PickupWindow[] = [{ id: "1", location_id: "porto", weekday: 5, opens_at: "10:00:00", closes_at: "12:00:00", slot_minutes: 60, active: true }];
+    const slots = buildPickupSlots(windows, 0, 0, new Date("2026-10-09T07:00:00Z"));
+    expect(slots.map((slot) => pickupSlotParts(slot.value).time)).toEqual(["10:00", "10:30", "11:00", "11:30"]);
+  });
 });
 
 describe("date helpers", () => {

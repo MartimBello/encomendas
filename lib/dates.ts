@@ -54,7 +54,7 @@ export function buildPickupSlots(
             locationId: window.location_id,
           });
         }
-        minutes += window.slot_minutes;
+        minutes += 30;
       }
     }
   }

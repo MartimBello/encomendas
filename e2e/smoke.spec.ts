@@ -115,6 +115,10 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(editDialog).toBeHidden();
   await expect(admin.getByText("Campanha atualizada.")).toBeVisible();
   await expect(admin.getByText("Peru assado", { exact: true })).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Exportações" })).toBeVisible();
+  await expect(admin.getByRole("link", { name: "Artigos por data" })).toBeVisible();
+  await expect(admin.getByRole("link", { name: "Artigos por loja e data" })).toBeVisible();
+  await expect(admin.getByRole("link", { name: "Todas as encomendas" })).toBeVisible();
 
   await admin.getByLabel("Nome do artigo").fill(productName);
   await admin.getByLabel("Unidade (quantidade normal)", { exact: true }).fill("un.");
@@ -179,7 +183,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store.getByText("Sem recheio", { exact: true })).toBeVisible();
   await store.getByLabel("Data de levantamento").click();
   await store.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
-  await store.keyboard.press("Escape");
+  await expect(store.locator('[data-slot="calendar"]')).not.toBeVisible();
   await store.getByLabel("Loja de levantamento").click();
   await store.getByRole("option").first().click();
   await expect(store.getByLabel("Hora de levantamento")).toBeEnabled();
@@ -205,7 +209,23 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
   await expect(store.getByText("Aceite", { exact: true })).toBeVisible();
   await expect(store.getByText("Versão 2", { exact: true }).first()).toBeVisible();
+  const seasonalOrderNumber = (await store.getByRole("heading", { level: 1 }).textContent())!;
+  const seasonalCustomer = `Cliente sazonal ${testInfo.project.name}`;
+  await store.goto("/loja/encomendas");
+  const seasonalRow = store.getByRole("row").filter({ hasText: seasonalOrderNumber });
+  await expect(seasonalRow).toContainText("Sazonal");
+  await store.getByLabel("Pesquisar encomendas").fill(seasonalCustomer);
+  await store.getByRole("button", { name: "Pesquisar" }).click();
+  await expect(store.getByRole("row").filter({ hasText: seasonalOrderNumber })).toBeVisible();
   await store.close();
+
+  const reportingAdmin = await browser.newPage();
+  await login(reportingAdmin, "admin@encomendas.local");
+  await reportingAdmin.goto("/admin/encomendas");
+  await reportingAdmin.getByLabel("Pesquisar encomendas").fill(seasonalCustomer);
+  await reportingAdmin.getByRole("button", { name: "Pesquisar" }).click();
+  await expect(reportingAdmin.getByRole("row").filter({ hasText: seasonalOrderNumber })).toContainText("Sazonal");
+  await reportingAdmin.close();
 });
 
 test("store creation, kitchen acceptance and cancellation acknowledgment", async ({ page, browser }) => {
@@ -218,13 +238,16 @@ test("store creation, kitchen acceptance and cancellation acknowledgment", async
   await page.getByLabel("Nome do cliente").fill("Cliente Playwright");
   await page.getByLabel(/^Email/).fill("playwright@example.pt");
   await page.getByLabel("Telefone").fill("912345678");
-  const pickupStore = page.getByLabel("Loja de levantamento");
+  await page.getByRole("radio", { name: "Entrega em casa" }).click();
+  await page.getByLabel("Morada de entrega").fill("Rua das Flores, 10, 4000-001 Porto");
+  const pickupStore = page.getByLabel("Loja responsável");
   await pickupStore.selectOption({ label: "Loja de Matosinhos" });
-  await page.getByLabel("Data de levantamento").click();
+  await page.getByLabel("Data de entrega").click();
   await page.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
-  const pickupTime = page.getByLabel("Hora de levantamento");
-  const firstPickupTime = await page.locator("datalist option").first().getAttribute("value");
-  await pickupTime.fill(firstPickupTime!);
+  await expect(page.locator('[data-slot="calendar"]')).not.toBeVisible();
+  const pickupTime = page.getByLabel("Hora de entrega");
+  await pickupTime.click();
+  await page.getByRole("option").first().click();
   await page.getByLabel("Nome do cliente").fill("Cliente Playwright");
   await page.getByLabel(/^Email/).fill("playwright@example.pt");
   await page.getByLabel("Telefone").fill("912345678");
@@ -236,6 +259,7 @@ test("store creation, kitchen acceptance and cancellation acknowledgment", async
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("button", { name: "Enviar à cozinha" }).click();
   await expect(page).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/, { timeout: 15_000 });
+  await expect(page.getByText("Rua das Flores, 10, 4000-001 Porto", { exact: true })).toBeVisible();
   await expect(page.evaluate(() => sessionStorage.getItem("encomendas:draft:new"))).resolves.toBeNull();
 
   const orderId = page.url().split("/").pop()!;

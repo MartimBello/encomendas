@@ -19,6 +19,7 @@ export type NotificationKind =
   | "accepted_order_cancelled";
 export type DeliveryStatus = "pending" | "processing" | "sent" | "failed" | "dead";
 export type ProductQuantityMode = "standard" | "selection" | "unit_weight";
+export type FulfillmentType = "pickup" | "delivery";
 
 export interface Profile {
   id: string;
@@ -147,6 +148,8 @@ export interface OrderRevision {
   customer_phone: string | null;
   pickup_store_id: string;
   pickup_at: string;
+  fulfillment_type: FulfillmentType;
+  delivery_address: string | null;
   general_notes: string;
   created_at: string;
   anonymized_at: string | null;

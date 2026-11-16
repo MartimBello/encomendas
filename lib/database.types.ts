@@ -131,14 +131,14 @@ isOneToOne: false
                   ]
                 },"order_revisions": {
                   Row: {
-                    "anonymized_at": string | null,"created_at": string,"created_by": string,"customer_email": string | null,"customer_name": string | null,"customer_phone": string | null,"general_notes": string,"id": string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
+                    "anonymized_at": string | null,"created_at": string,"created_by": string,"customer_email": string | null,"customer_name": string | null,"customer_phone": string | null,"delivery_address": string | null,"fulfillment_type": string,"general_notes": string,"id": string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "anonymized_at"?: string | null,"created_at"?: string,"created_by": string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"general_notes"?: string,"id"?: string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
+                    "anonymized_at"?: string | null,"created_at"?: string,"created_by": string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
                   }
                   Update: {
-                    "anonymized_at"?: string | null,"created_at"?: string,"created_by"?: string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"general_notes"?: string,"id"?: string,"order_id"?: string,"pickup_at"?: string,"pickup_store_id"?: string,"version"?: number
+                    "anonymized_at"?: string | null,"created_at"?: string,"created_by"?: string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id"?: string,"pickup_at"?: string,"pickup_store_id"?: string,"version"?: number
                   }
                   Relationships: [
                     {
@@ -394,6 +394,9 @@ isOneToOne: false
 "assert_valid_seasonal_revision_items":
 { Args: { "p_campaign_id": string,"p_items": Json,"p_order_id": string }; Returns: undefined
                            },
+"assert_fulfillment_details":
+{ Args: { "p_delivery_address": string,"p_fulfillment_type": string }; Returns: undefined
+                           },
 "can_read_order":
 { Args: { "target": Omit<Database["public"]['Tables']["orders"]['Row'], Database["public"]['Tables']["orders"]['ComputedFields']> }; Returns: boolean
                            },
@@ -423,10 +426,10 @@ isOneToOne: false
         isSetofReturn: true
       } },
 "create_order":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: string
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: string
                            },
 "create_seasonal_order":
-{ Args: { "p_campaign_id": string,"p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: string
+{ Args: { "p_campaign_id": string,"p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: string
                            },
 "current_profile_location":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -443,11 +446,16 @@ isOneToOne: false
 "reject_order":
 { Args: { "p_expected_version": number,"p_order_id": string,"p_reason"?: string }; Returns: undefined
                            },
+"search_orders":
+{ Args: { "p_query": string }; Returns: {
+              "order_id": string
+            }[]
+                          },
 "submit_order_revision":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: number
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: number
                            },
 "submit_seasonal_order_revision":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: number
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: number
                            },
 "skip_email_without_recipient":
 { Args: Record<PropertyKey, never>; Returns: unknown

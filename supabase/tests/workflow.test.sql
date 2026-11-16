@@ -1,5 +1,5 @@
 begin;
-select plan(40);
+select plan(43);
 truncate table public.orders cascade;
 
 update public.products
@@ -7,6 +7,26 @@ set variations = array['Com recheio', 'Sem recheio']
 where id = '30000000-0000-4000-8000-000000000001';
 
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
+
+select throws_ok(
+  $$ select public.assert_fulfillment_details('delivery', '') $$,
+  'P0001', 'Morada de entrega obrigatória.',
+  'home delivery requires an address'
+);
+select lives_ok(
+  $$ select public.assert_fulfillment_details('delivery', 'Rua das Flores, 10, Porto') $$,
+  'home delivery accepts a valid address'
+);
+select throws_ok(
+  $$ select public.assert_order_details(
+    'Cliente Teste', 'cliente@example.pt', '912345678',
+    '10000000-0000-4000-8000-000000000003',
+    ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours 15 minutes') at time zone 'Europe/Lisbon'),
+    ''
+  ) $$,
+  'P0001', 'Escolha um horário disponível.',
+  'regular orders reject times outside the 30-minute grid'
+);
 
 select lives_ok(
   $$ select public.create_order(
@@ -16,7 +36,7 @@ select lives_ok(
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
     '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""},{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
-    null
+    'pickup', null, null
   ) $$,
   'store can create a valid order'
 );
@@ -37,7 +57,7 @@ select is(
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
     '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""},{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
-    null
+    'pickup', null, null
   ),
   (select id from public.orders limit 1),
   'reusing the idempotency key returns the same order'
@@ -77,7 +97,8 @@ select lives_ok(
     '10000000-0000-4000-8000-000000000003',
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     'Sem cebola',
-    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2,"note":""}]'::jsonb
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":2,"note":""}]'::jsonb,
+    'pickup', null
   ) $$,
   'origin store can revise an accepted order'
 );
@@ -126,7 +147,7 @@ select lives_ok(
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
     '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":1,"note":""}]'::jsonb,
-    null
+    'pickup', null, null
   ) $$,
   'store can create another order for rejection'
 );
@@ -147,7 +168,7 @@ select lives_ok(
     ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
     '',
     '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""}]'::jsonb,
-    null
+    'pickup', null, null
   ) $$,
   'store can create an order without an email'
 );

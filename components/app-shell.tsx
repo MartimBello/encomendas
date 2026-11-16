@@ -29,6 +29,7 @@ const navigation: Record<AppRole, NavigationItem[]> = {
   ],
   admin: [
     { href: "/admin", label: "Resumo", icon: PackageSearch },
+    { href: "/admin/encomendas", label: "Encomendas", icon: ClipboardList },
     { href: "/admin/utilizadores", label: "Equipa", icon: Users },
     { href: "/admin/catalogo", label: "Catálogo", icon: ShoppingBag },
     { href: "/admin/sazonais", label: "Sazonais", icon: Gift },
