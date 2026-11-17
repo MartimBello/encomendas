@@ -35,6 +35,6 @@ describe("Portuguese order email", () => {
     const rendered = renderOrderEmail("order_accepted", order, revision, []);
     expect(rendered.html).toContain("Entrega:");
     expect(rendered.html).toContain("Rua das Flores &amp; 10, Porto");
-    expect(rendered.html).toContain("Loja responsável:");
+    expect(rendered.html).not.toContain("Loja responsável:");
   });
 });

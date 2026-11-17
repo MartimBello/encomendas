@@ -22,6 +22,12 @@ function requireDeliveryAddress(value: { fulfillment_type: "pickup" | "delivery"
   }
 }
 
+function requirePickupStore(value: { fulfillment_type: "pickup" | "delivery"; pickup_store_id: string | null }, context: z.RefinementCtx) {
+  if (value.fulfillment_type === "pickup" && !value.pickup_store_id) {
+    context.addIssue({ code: "custom", path: ["pickup_store_id"], message: "Escolha a loja de levantamento." });
+  }
+}
+
 export const orderPayloadSchema = z.object({
   idempotency_key: databaseUuid,
   order_id: databaseUuid.optional(),
@@ -29,12 +35,12 @@ export const orderPayloadSchema = z.object({
   customer_name: z.string().trim().min(2, "Indique o nome do cliente.").max(120),
   customer_email: optionalCustomerEmail,
   customer_phone: z.string().trim().max(40).default(""),
-  pickup_store_id: databaseUuid,
+  pickup_store_id: databaseUuid.nullable(),
   pickup_at: z.iso.datetime({ offset: true }),
   ...fulfillmentFields,
   general_notes: z.string().trim().max(2000).default(""),
   items: z.array(orderItemSchema).min(1, "Adicione pelo menos um artigo.").max(100),
-}).superRefine(requireDeliveryAddress);
+}).superRefine(requireDeliveryAddress).superRefine(requirePickupStore);
 
 export const seasonalOrderPayloadSchema = z.object({
   idempotency_key: databaseUuid,

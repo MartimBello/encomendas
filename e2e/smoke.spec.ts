@@ -57,6 +57,7 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
 });
 
 test("seasonal campaigns expose their special menu and pickup ranges", async ({ browser }, testInfo) => {
+  test.setTimeout(120_000);
   const productName = `Produto Playwright ${testInfo.project.name}`;
   const editedProductName = `${productName} editado`;
   const categoryName = `Categoria Playwright ${testInfo.project.name} ${Date.now()}`;
@@ -181,6 +182,9 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(store.getByRole("heading", { name: "Sobremesas" })).toBeVisible();
   await expect(store.getByText("Com recheio", { exact: true })).toBeVisible();
   await expect(store.getByText("Sem recheio", { exact: true })).toBeVisible();
+  await store.getByRole("radio", { name: "Entrega em casa" }).click();
+  await expect(store.getByLabel("Loja de levantamento")).toHaveCount(0);
+  await store.getByRole("radio", { name: "Levantamento em loja" }).click();
   await store.getByLabel("Data de levantamento").click();
   await store.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
   await expect(store.locator('[data-slot="calendar"]')).not.toBeVisible();
@@ -240,8 +244,7 @@ test("store creation, kitchen acceptance and cancellation acknowledgment", async
   await page.getByLabel("Telefone").fill("912345678");
   await page.getByRole("radio", { name: "Entrega em casa" }).click();
   await page.getByLabel("Morada de entrega").fill("Rua das Flores, 10, 4000-001 Porto");
-  const pickupStore = page.getByLabel("Loja responsável");
-  await pickupStore.selectOption({ label: "Loja de Matosinhos" });
+  await expect(page.getByLabel("Loja de levantamento")).toHaveCount(0);
   await page.getByLabel("Data de entrega").click();
   await page.locator('[data-slot="calendar"] button[data-day]:not([disabled])').first().click();
   await expect(page.locator('[data-slot="calendar"]')).not.toBeVisible();

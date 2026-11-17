@@ -146,7 +146,7 @@ export interface OrderRevision {
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
-  pickup_store_id: string;
+  pickup_store_id: string | null;
   pickup_at: string;
   fulfillment_type: FulfillmentType;
   delivery_address: string | null;
@@ -161,7 +161,7 @@ export interface Order {
   order_number: string;
   campaign_id: string | null;
   ordering_store_id: string;
-  pickup_store_id: string;
+  pickup_store_id: string | null;
   status: OrderStatus;
   current_version: number;
   current_revision_id: string;

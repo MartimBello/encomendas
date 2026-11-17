@@ -24,7 +24,8 @@ describe("order validation", () => {
   it("requires at least one item", () => expect(orderPayloadSchema.safeParse({ ...validOrder, items: [] }).success).toBe(false));
   it("rejects non-positive quantities", () => expect(orderPayloadSchema.safeParse({ ...validOrder, items: [{ ...validOrder.items[0], quantity: 0 }] }).success).toBe(false));
   it("requires an address for home delivery", () => expect(orderPayloadSchema.safeParse({ ...validOrder, fulfillment_type: "delivery", delivery_address: "" }).success).toBe(false));
-  it("accepts home delivery with an address", () => expect(orderPayloadSchema.safeParse({ ...validOrder, fulfillment_type: "delivery", delivery_address: "Rua das Flores, 10, Porto" }).success).toBe(true));
+  it("accepts home delivery without a pickup store", () => expect(orderPayloadSchema.safeParse({ ...validOrder, fulfillment_type: "delivery", delivery_address: "Rua das Flores, 10, Porto", pickup_store_id: null }).success).toBe(true));
+  it("requires a pickup store for store pickup", () => expect(orderPayloadSchema.safeParse({ ...validOrder, pickup_store_id: null }).success).toBe(false));
 });
 
 describe("settings validation", () => {

@@ -50,7 +50,6 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
           <p className="flex items-center gap-2 text-muted-foreground"><Phone className="size-4" />{revision.customer_phone || "—"}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}: {formatDateTime(revision.pickup_at)}</p>
           <p className="flex items-center gap-2 text-muted-foreground"><MapPin className="size-4" />{revision.fulfillment_type === "delivery" ? revision.delivery_address : order.pickup_store?.name}</p>
-          {revision.fulfillment_type === "delivery" && <p className="flex items-center gap-2 text-muted-foreground"><Store className="size-4" />Loja responsável: {order.pickup_store?.name}</p>}
           <p className="flex items-center gap-2 text-muted-foreground"><Store className="size-4" />Origem: {order.ordering_store?.name}</p>
         </CardContent>
       </Card>

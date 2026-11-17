@@ -63,7 +63,6 @@ export function PrintOrder({
           <p>
             <strong>{revision.fulfillment_type === "delivery" ? "Morada" : "Loja"}:</strong> {revision.fulfillment_type === "delivery" ? revision.delivery_address : `${order.pickup_store?.name} · ${order.pickup_store?.address}`}
           </p>
-          {revision.fulfillment_type === "delivery" && <p><strong>Loja responsável:</strong> {order.pickup_store?.name}</p>}
           <p>
             <strong>Origem:</strong> {order.ordering_store?.name}
           </p>

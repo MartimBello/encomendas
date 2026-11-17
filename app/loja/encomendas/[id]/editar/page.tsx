@@ -22,5 +22,5 @@ export default async function EditOrderPage({ params }: PageProps<"/loja/encomen
   }
 
   const options = await getOrderFormOptions();
-  return <><PageHeader title={`Rever ${result.order.order_number}`} description="A alteração cria uma nova versão e volta a pedir confirmação à cozinha." /><OrderForm {...options} orderId={id} initial={result.order.revision} /></>;
+  return <><PageHeader title={`Rever ${result.order.order_number}`} description="A alteração cria uma nova versão e volta a pedir confirmação à cozinha." /><OrderForm {...options} orderingStoreId={result.order.ordering_store_id} orderId={id} initial={result.order.revision} /></>;
 }

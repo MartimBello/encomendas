@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(18);
 
 select has_table('public', 'orders', 'orders table exists');
 select has_table('public', 'order_revisions', 'order revisions table exists');
@@ -10,6 +10,8 @@ select has_column('public', 'order_items', 'unit_weights', 'order lines snapshot
 select has_column('public', 'order_items', 'unit_weight_label', 'order lines snapshot the weight unit');
 select has_column('public', 'order_revisions', 'fulfillment_type', 'order revisions snapshot the fulfillment type');
 select has_column('public', 'order_revisions', 'delivery_address', 'order revisions snapshot the delivery address');
+select col_is_null('public', 'orders', 'pickup_store_id', 'delivery orders do not require a pickup store');
+select col_is_null('public', 'order_revisions', 'pickup_store_id', 'delivery revisions do not require a pickup store');
 select has_function('public', 'create_order', array['uuid','text','text','text','uuid','timestamp with time zone','text','jsonb','text','text','uuid'], 'create_order RPC exists');
 select has_function('public', 'accept_order', array['uuid','integer'], 'accept_order RPC exists');
 select has_function('public', 'reject_order', array['uuid','integer','text'], 'reject_order RPC exists');
