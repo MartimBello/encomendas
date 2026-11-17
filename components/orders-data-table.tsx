@@ -55,7 +55,7 @@ export function OrdersDataTable({ orders, route, detailRoute, search, status, em
             <TableCell className="font-medium">{order.revision?.customer_name || "Dados anonimizados"}</TableCell>
             <TableCell>{order.campaign ? <Badge variant="secondary">Sazonal · {order.campaign.name}</Badge> : <Badge variant="outline">Regular</Badge>}</TableCell>
             <TableCell>{order.revision ? <><p>{order.revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}</p><p className="text-xs text-muted-foreground">{formatDateTime(order.revision.pickup_at)}</p></> : "—"}</TableCell>
-            <TableCell><p>{order.ordering_store?.name || "—"}</p>{order.pickup_store?.name && order.pickup_store.name !== order.ordering_store?.name && <p className="text-xs text-muted-foreground">{order.revision?.fulfillment_type === "delivery" ? "Responsável" : "Levantar"}: {order.pickup_store.name}</p>}</TableCell>
+            <TableCell><p>{order.ordering_store?.name || "—"}</p>{order.revision?.fulfillment_type === "pickup" && order.pickup_store?.name && order.pickup_store.name !== order.ordering_store?.name && <p className="text-xs text-muted-foreground">Levantar: {order.pickup_store.name}</p>}</TableCell>
             <TableCell><StatusBadge status={order.status} revised={order.current_version > 1} /></TableCell>
             <TableCell className="text-right"><Button asChild variant="ghost" size="sm"><Link href={`${detailRoute}/${order.id}`}>Ver<ArrowRight data-icon="inline-end" /></Link></Button></TableCell>
           </TableRow>)}

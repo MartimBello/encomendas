@@ -1,5 +1,5 @@
 begin;
-select plan(43);
+select plan(46);
 truncate table public.orders cascade;
 
 update public.products
@@ -180,6 +180,22 @@ select lives_ok(
   'kitchen can accept an order without an email'
 );
 select is((select count(*)::integer from public.notification_outbox where channel = 'email' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440101')), 0, 'no email delivery is queued without a recipient');
+
+set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
+select lives_ok(
+  $$ select public.create_order(
+    '550e8400-e29b-41d4-a716-446655440098',
+    'Cliente Entrega', 'entrega@example.pt', '912345678',
+    null,
+    ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
+    '',
+    '[{"product_id":"30000000-0000-4000-8000-000000000001","variation":"Com recheio","quantity":1,"note":""}]'::jsonb,
+    'delivery', 'Rua das Flores, 10, Porto', null
+  ) $$,
+  'store can create a delivery without a pickup store'
+);
+select is((select pickup_store_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440098'), null::uuid, 'delivery order has no pickup store');
+select is((select pickup_store_id from public.order_revisions where order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440098')), null::uuid, 'delivery revision has no pickup store');
 
 select * from finish();
 rollback;

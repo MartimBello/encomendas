@@ -56,7 +56,7 @@ export function renderOrderEmail(
       <tr><td style="padding:24px"><p>Olá ${escapeHtml(revision.customer_name || "")},</p><p>${intro}</p>
       <p><strong>${order.order_number}</strong> · versão ${revision.version}</p>
       ${order.campaign ? `<p><strong>Campanha sazonal:</strong> ${escapeHtml(order.campaign.name)}</p>` : ""}
-      <p><strong>${revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}:</strong> ${formatDateTime(revision.pickup_at)}<br><strong>${revision.fulfillment_type === "delivery" ? "Morada" : "Local"}:</strong> ${escapeHtml(revision.fulfillment_type === "delivery" ? revision.delivery_address || "Morada não indicada" : order.pickup_store?.name || "Loja selecionada")}${revision.fulfillment_type === "delivery" ? `<br><strong>Loja responsável:</strong> ${escapeHtml(order.pickup_store?.name || "Loja selecionada")}` : ""}</p>
+      <p><strong>${revision.fulfillment_type === "delivery" ? "Entrega" : "Levantamento"}:</strong> ${formatDateTime(revision.pickup_at)}<br><strong>${revision.fulfillment_type === "delivery" ? "Morada" : "Local"}:</strong> ${escapeHtml(revision.fulfillment_type === "delivery" ? revision.delivery_address || "Morada não indicada" : order.pickup_store?.name || "Loja selecionada")}</p>
       <table role="presentation" width="100%">${rows}</table>
       ${revision.general_notes ? `<p><strong>Observações:</strong><br>${escapeHtml(revision.general_notes)}</p>` : ""}
       <p style="color:#64706c;font-size:13px;margin-top:24px">Se precisar de ajuda, contacte a loja onde registou a encomenda.</p>

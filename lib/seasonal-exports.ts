@@ -26,7 +26,7 @@ function selectedOrders(orders: Order[], status: SeasonalExportStatus) {
 
 function storeName(order: Order, dimension: SeasonalExportStore) {
   if (dimension === "ordering") return order.ordering_store?.name ?? "Loja desconhecida";
-  if (dimension === "pickup") return order.pickup_store?.name ?? "Loja desconhecida";
+  if (dimension === "pickup") return order.pickup_store?.name ?? "Sem levantamento em loja";
   return "";
 }
 
@@ -78,7 +78,7 @@ function buildOrderRows(orders: Order[], status: SeasonalExportStatus): ExportTa
 
   return {
     suffix: "encomendas",
-    headers: ["Encomenda", "Estado", "Campanha", "Versão", "Cliente", "Email", "Telefone", "Loja de origem", "Loja responsável", "Modalidade", "Morada de entrega", "Data de receção", "Hora de receção", "Artigo", "Quantidade", "Unidade", "Peso total", "Unidade de peso", "Nota do artigo", "Observações gerais", "Motivo da rejeição", "Data do estado", "Criada em", "Atualizada em"],
+    headers: ["Encomenda", "Estado", "Campanha", "Versão", "Cliente", "Email", "Telefone", "Loja de origem", "Loja de levantamento", "Modalidade", "Morada de entrega", "Data de receção", "Hora de receção", "Artigo", "Quantidade", "Unidade", "Peso total", "Unidade de peso", "Nota do artigo", "Observações gerais", "Motivo da rejeição", "Data do estado", "Criada em", "Atualizada em"],
     rows,
   };
 }

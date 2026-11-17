@@ -1,5 +1,5 @@
 begin;
-select plan(37);
+select plan(39);
 
 select has_table('public', 'seasonal_campaigns', 'seasonal campaigns table exists');
 select has_table('public', 'seasonal_products', 'seasonal products table exists');
@@ -104,11 +104,13 @@ select lives_ok(
     (((now() at time zone 'Europe/Lisbon')::date + 10) + time '10:30') at time zone 'Europe/Lisbon',
     'Versão revista',
     '[{"product_id":"49100000-0000-4000-8000-000000000001","variation":"Sem recheio","quantity":2.5,"note":"Bem passado"}]'::jsonb,
-    'pickup', null
+    'delivery', 'Rua das Flores, 10, Porto'
   ) $$,
   'store can revise a seasonal order with its campaign menu'
 );
 select ok((select current_version = 2 and status = 'accepted' and accepted_revision_id = current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206'), 'seasonal revision is versioned and confirmed automatically');
+select is((select pickup_store_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206'), null::uuid, 'seasonal delivery has no pickup store');
+select is((select pickup_store_id from public.order_revisions where id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), null::uuid, 'seasonal delivery revision has no pickup store');
 select is((select quantity from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), 2.500::numeric, 'seasonal revision replaces the reserved quantity without double counting stock');
 select is((select customer_email from public.order_revisions where id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), null::text, 'seasonal revision stores an empty email as null');
 select is((select count(*)::integer from public.notification_outbox where kind = 'order_updated_accepted' and order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440206')), 0, 'seasonal revision without email does not queue a delivery');

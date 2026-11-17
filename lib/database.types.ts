@@ -131,14 +131,14 @@ isOneToOne: false
                   ]
                 },"order_revisions": {
                   Row: {
-                    "anonymized_at": string | null,"created_at": string,"created_by": string,"customer_email": string | null,"customer_name": string | null,"customer_phone": string | null,"delivery_address": string | null,"fulfillment_type": string,"general_notes": string,"id": string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
+                    "anonymized_at": string | null,"created_at": string,"created_by": string,"customer_email": string | null,"customer_name": string | null,"customer_phone": string | null,"delivery_address": string | null,"fulfillment_type": string,"general_notes": string,"id": string,"order_id": string,"pickup_at": string,"pickup_store_id": string | null,"version": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "anonymized_at"?: string | null,"created_at"?: string,"created_by": string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id": string,"pickup_at": string,"pickup_store_id": string,"version": number
+                    "anonymized_at"?: string | null,"created_at"?: string,"created_by": string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id": string,"pickup_at": string,"pickup_store_id"?: string | null,"version": number
                   }
                   Update: {
-                    "anonymized_at"?: string | null,"created_at"?: string,"created_by"?: string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id"?: string,"pickup_at"?: string,"pickup_store_id"?: string,"version"?: number
+                    "anonymized_at"?: string | null,"created_at"?: string,"created_by"?: string,"customer_email"?: string | null,"customer_name"?: string | null,"customer_phone"?: string | null,"delivery_address"?: string | null,"fulfillment_type"?: string,"general_notes"?: string,"id"?: string,"order_id"?: string,"pickup_at"?: string,"pickup_store_id"?: string | null,"version"?: number
                   }
                   Relationships: [
                     {
@@ -171,14 +171,14 @@ isOneToOne: false
                   ]
                 },"orders": {
                   Row: {
-                    "accepted_at": string | null,"accepted_by": string | null,"accepted_revision_id": string | null,"campaign_id": string | null,"cancellation_acknowledged_at": string | null,"cancellation_acknowledged_by": string | null,"cancellation_requires_ack": boolean,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string,"current_revision_id": string | null,"current_version": number,"id": string,"idempotency_key": string,"order_number": string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at": string | null,"rejected_by": string | null,"rejection_reason": string | null,"status": Database["public"]['Enums']["order_status"],"updated_at": string,"can_read_order": boolean | null
+                    "accepted_at": string | null,"accepted_by": string | null,"accepted_revision_id": string | null,"campaign_id": string | null,"cancellation_acknowledged_at": string | null,"cancellation_acknowledged_by": string | null,"cancellation_requires_ack": boolean,"cancelled_at": string | null,"cancelled_by": string | null,"created_at": string,"created_by": string,"current_revision_id": string | null,"current_version": number,"id": string,"idempotency_key": string,"order_number": string,"ordering_store_id": string,"pickup_store_id": string | null,"rejected_at": string | null,"rejected_by": string | null,"rejection_reason": string | null,"status": Database["public"]['Enums']["order_status"],"updated_at": string,"can_read_order": boolean | null
                   }
                   ComputedFields: "can_read_order"
                   Insert: {
-                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by": string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key": string,"order_number"?: string,"ordering_store_id": string,"pickup_store_id": string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
+                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by": string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key": string,"order_number"?: string,"ordering_store_id": string,"pickup_store_id"?: string | null,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
                   }
                   Update: {
-                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key"?: string,"order_number"?: string,"ordering_store_id"?: string,"pickup_store_id"?: string,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
+                    "accepted_at"?: string | null,"accepted_by"?: string | null,"accepted_revision_id"?: string | null,"campaign_id"?: string | null,"cancellation_acknowledged_at"?: string | null,"cancellation_acknowledged_by"?: string | null,"cancellation_requires_ack"?: boolean,"cancelled_at"?: string | null,"cancelled_by"?: string | null,"created_at"?: string,"created_by"?: string,"current_revision_id"?: string | null,"current_version"?: number,"id"?: string,"idempotency_key"?: string,"order_number"?: string,"ordering_store_id"?: string,"pickup_store_id"?: string | null,"rejected_at"?: string | null,"rejected_by"?: string | null,"rejection_reason"?: string | null,"status"?: Database["public"]['Enums']["order_status"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -383,7 +383,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: number
                            },
 "assert_order_details":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: undefined
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_general_notes": string,"p_pickup_at": string,"p_pickup_store_id": string | null }; Returns: undefined
                            },
 "assert_valid_items":
 { Args: { "p_items": Json }; Returns: undefined
@@ -426,7 +426,7 @@ isOneToOne: false
         isSetofReturn: true
       } },
 "create_order":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: string
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_store_id": string | null }; Returns: string
                            },
 "create_seasonal_order":
 { Args: { "p_campaign_id": string,"p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_idempotency_key": string,"p_items": Json,"p_ordering_store_id"?: string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: string
@@ -452,7 +452,7 @@ isOneToOne: false
             }[]
                           },
 "submit_order_revision":
-{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string }; Returns: number
+{ Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string | null }; Returns: number
                            },
 "submit_seasonal_order_revision":
 { Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_slot_id": string }; Returns: number
