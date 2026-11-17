@@ -22,7 +22,7 @@ import { StatusBadge } from "@/components/status-badge";
 export function KitchenBoard({ initialOrders, automaticAcceptance = false }: { initialOrders: Order[]; automaticAcceptance?: boolean }) {
   const router = useRouter();
   const orders = initialOrders;
-  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [online, setOnline] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [pushStatus, setPushStatus] = useState<"checking" | "idle" | "enabled" | "unsupported" | "denied" | "error">("checking");
   const [realtime, setRealtime] = useState<"connecting" | "connected" | "error">(() => createClient() ? "connecting" : "error");
@@ -56,6 +56,7 @@ export function KitchenBoard({ initialOrders, automaticAcceptance = false }: { i
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
+    update();
     window.addEventListener("online", update); window.addEventListener("offline", update);
     const supabase = createClient();
     if (!supabase) return () => undefined;

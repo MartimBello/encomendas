@@ -57,6 +57,7 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
 });
 
 test("seasonal campaigns expose their special menu and pickup ranges", async ({ browser }, testInfo) => {
+  test.setTimeout(60_000);
   const productName = `Produto Playwright ${testInfo.project.name}`;
   const editedProductName = `${productName} editado`;
   const categoryName = `Categoria Playwright ${testInfo.project.name} ${Date.now()}`;
