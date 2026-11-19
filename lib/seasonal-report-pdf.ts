@@ -73,7 +73,7 @@ function orderHeader(doc: PDFKit.PDFDocument, report: SeasonalReportView, sheet:
   infoCell(doc, sheet.deliveryAddress ? "Data de entrega" : "Data de levantamento", sheet.serviceDate, margin + half + 18, firstY, half);
   const secondY = firstY + 54;
   infoCell(doc, "Hora", sheet.serviceTime, margin, secondY, half);
-  infoCell(doc, "Loja de origem", sheet.orderingStore, margin + half + 18, secondY, half);
+  infoCell(doc, sheet.serviceLocationLabel, sheet.serviceLocation, margin + half + 18, secondY, half);
   const thirdY = secondY + 54;
   infoCell(doc, "Cliente", sheet.customerName, margin, thirdY, half);
   infoCell(doc, "Telefone", sheet.customerPhone, margin + half + 18, thirdY, half);
@@ -82,17 +82,20 @@ function orderHeader(doc: PDFKit.PDFDocument, report: SeasonalReportView, sheet:
     infoCell(doc, "Morada de entrega", sheet.deliveryAddress, margin, doc.y, available);
     doc.y += 54;
   }
+  infoCell(doc, "Loja de origem", sheet.orderingStore, margin, doc.y, half);
+  infoCell(doc, "Total", sheet.estimatedRevenue, margin + half + 18, doc.y, half);
+  doc.y += 54;
 }
 
 function orderTableHeader(doc: PDFKit.PDFDocument, totals = false) {
   const y = doc.y;
   const width = doc.page.width - margin * 2;
-  const productWidth = width * 0.58;
-  const quantityWidth = width * 0.21;
+  const productWidth = width * 0.45;
+  const quantityWidth = width * 0.2;
   const columns = [
     { label: "Artigo", x: margin, width: productWidth, align: "left" as const },
     { label: totals ? "Quantidade total" : "Quantidade", x: margin + productWidth, width: quantityWidth, align: "right" as const },
-    { label: "Peso total", x: margin + productWidth + quantityWidth, width: width - productWidth - quantityWidth, align: "right" as const },
+    { label: "Pesos por unidade / total", x: margin + productWidth + quantityWidth, width: width - productWidth - quantityWidth, align: "right" as const },
   ];
   for (const column of columns) {
     doc.rect(column.x, y, column.width, 26).fillAndStroke(palette.primary, palette.primary);
@@ -101,25 +104,36 @@ function orderTableHeader(doc: PDFKit.PDFDocument, totals = false) {
   doc.y = y + 26;
 }
 
-function orderRow(doc: PDFKit.PDFDocument, product: string, quantity: string, totalWeight: string, shaded: boolean) {
+function orderRowHeight(doc: PDFKit.PDFDocument, product: string, quantity: string, weightDetail: string) {
   const width = doc.page.width - margin * 2;
-  const productWidth = width * 0.58;
-  const quantityWidth = width * 0.21;
+  const productWidth = width * 0.45;
+  const quantityWidth = width * 0.2;
+  const weightWidth = width - productWidth - quantityWidth;
   doc.font("Noto").fontSize(9);
-  const height = Math.max(28, Math.min(48, doc.heightOfString(printable(product), { width: productWidth - 12 }) + 12));
+  return Math.max(28, Math.max(
+    doc.heightOfString(printable(product), { width: productWidth - 12 }),
+    doc.heightOfString(printable(quantity), { width: quantityWidth - 12 }),
+    doc.heightOfString(printable(weightDetail || "-"), { width: weightWidth - 12 }),
+  ) + 12);
+}
+
+function orderRow(doc: PDFKit.PDFDocument, product: string, quantity: string, weightDetail: string, shaded: boolean) {
+  const width = doc.page.width - margin * 2;
+  const productWidth = width * 0.45;
+  const quantityWidth = width * 0.2;
+  const weightWidth = width - productWidth - quantityWidth;
+  const height = orderRowHeight(doc, product, quantity, weightDetail);
   const y = doc.y;
   const columns = [
     { value: product, x: margin, width: productWidth, align: "left" as const },
     { value: quantity, x: margin + productWidth, width: quantityWidth, align: "right" as const },
-    { value: totalWeight || "-", x: margin + productWidth + quantityWidth, width: width - productWidth - quantityWidth, align: "right" as const },
+    { value: weightDetail || "-", x: margin + productWidth + quantityWidth, width: weightWidth, align: "right" as const },
   ];
   for (const column of columns) {
     doc.rect(column.x, y, column.width, height).fillAndStroke(shaded ? "#f7f8f7" : palette.paper, palette.border);
     doc.fillColor(palette.ink).font("Noto").fontSize(9).text(printable(column.value), column.x + 6, y + 7, {
       width: column.width - 12,
-      height: height - 10,
       align: column.align,
-      ellipsis: true,
     });
   }
   doc.y = y + height;
@@ -132,12 +146,13 @@ function drawOrderSheet(doc: PDFKit.PDFDocument, report: SeasonalReportView, she
   doc.y += 24;
   orderTableHeader(doc);
   sheet.items.forEach((item, index) => {
-    if (doc.y + 48 > pageBottom(doc)) {
+    const weightDetail = item.unitWeights ? `${item.unitWeights}\nTotal: ${item.totalWeight}` : "";
+    if (doc.y + orderRowHeight(doc, item.product, item.quantity, weightDetail) > pageBottom(doc)) {
       doc.addPage();
       orderHeader(doc, report, sheet, true);
       orderTableHeader(doc);
     }
-    orderRow(doc, item.product, item.quantity, item.totalWeight, index % 2 === 1);
+    orderRow(doc, item.product, item.quantity, weightDetail, index % 2 === 1);
   });
 }
 
@@ -248,13 +263,13 @@ export async function renderSeasonalReportPdf(report: SeasonalReportView) {
     report.orderSheets.forEach((sheet) => drawOrderSheet(doc, report, sheet));
   } else {
     doc.addPage();
-    documentHeader(doc, report.title, report.generatedAt, report.summary);
+    documentHeader(doc, report.title, report.generatedAt, `${report.summary} · ${report.revenueSummary}`);
     for (const section of report.productSections) drawProductSection(doc, report, section);
   }
 
   if (!report.rowCount) {
     doc.addPage();
-    documentHeader(doc, report.title, report.generatedAt, report.summary);
+    documentHeader(doc, report.title, report.generatedAt, `${report.summary} · ${report.revenueSummary}`);
     doc.roundedRect(margin, doc.y, doc.page.width - margin * 2, 70, 6).fillAndStroke(palette.soft, palette.border);
     doc.fillColor(palette.ink).font("NotoBold").fontSize(12).text("Sem resultados", margin + 12, doc.y + 15);
     doc.fillColor(palette.muted).font("Noto").fontSize(9).text("Não existem encomendas aceites para esta exportação.", margin + 12, doc.y + 36);

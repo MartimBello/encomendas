@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Order, OrderItem, SeasonalCampaign } from "@/lib/domain";
 import { formatDate, formatDateTime, pickupSlotParts } from "@/lib/dates";
-import { formatProductName, formatQuantity } from "@/lib/utils";
+import { formatCurrency, formatProductName, formatQuantity, orderRevenueEstimate } from "@/lib/utils";
 
 export const reportModes = ["order_sheets", "product_totals"] as const;
 export type SeasonalReportMode = (typeof reportModes)[number];
@@ -20,6 +20,7 @@ export type SeasonalOrderSheetItem = {
   id: string;
   product: string;
   quantity: string;
+  unitWeights: string;
   totalWeight: string;
 };
 
@@ -29,11 +30,14 @@ export type SeasonalOrderSheet = {
   version: number;
   orderingStore: string;
   fulfillmentLabel: string;
+  serviceLocationLabel: string;
+  serviceLocation: string;
   serviceDate: string;
   serviceTime: string;
   customerName: string;
   customerPhone: string;
   deliveryAddress: string | null;
+  estimatedRevenue: string;
   items: SeasonalOrderSheetItem[];
 };
 
@@ -58,6 +62,7 @@ export type SeasonalReportView = {
   campaignName: string;
   generatedAt: string;
   summary: string;
+  revenueSummary: string;
   rowCount: number;
   orderSheets: SeasonalOrderSheet[];
   productSections: SeasonalProductTotalSection[];
@@ -117,6 +122,11 @@ function weightLabel(item: OrderItem, weight = totalWeight(item)) {
   return weight ? `${formatQuantity(weight)} ${item.unit_weight_label?.trim() || "kg"}` : "";
 }
 
+function unitWeightsLabel(item: OrderItem) {
+  const unit = item.unit_weight_label?.trim() || "kg";
+  return item.unit_weights?.map((weight) => `${formatQuantity(weight)} ${unit}`).join(" · ") ?? "";
+}
+
 function fulfillmentLabel(order: Order) {
   return order.revision?.fulfillment_type === "delivery" ? "Entrega em casa" : "Levantamento em loja";
 }
@@ -143,21 +153,30 @@ function buildOrderSheets(orders: Order[]): SeasonalOrderSheet[] {
   return orders.map((order) => {
     const revision = order.revision!;
     const service = pickupSlotParts(revision.pickup_at);
+    const revenue = orderRevenueEstimate(revision.items);
     return {
       id: order.id,
       orderNumber: order.order_number,
       version: order.current_version,
       orderingStore: order.ordering_store?.name ?? "Loja desconhecida",
       fulfillmentLabel: fulfillmentLabel(order),
+      serviceLocationLabel: revision.fulfillment_type === "delivery" ? "Local do serviço" : "Loja de levantamento",
+      serviceLocation: revision.fulfillment_type === "delivery"
+        ? "Entrega ao domicílio"
+        : order.pickup_store?.name ?? "Loja desconhecida",
       serviceDate: formatDate(`${service.date}T12:00:00Z`),
       serviceTime: service.time,
       customerName: revision.customer_name ?? "Dados anonimizados",
       customerPhone: revision.customer_phone ?? "Não indicado",
       deliveryAddress: revision.fulfillment_type === "delivery" ? revision.delivery_address ?? "Não indicada" : null,
+      estimatedRevenue: revenue
+        ? `${formatCurrency(revenue.totalCents)}${revenue.complete ? "" : " · parcial"}`
+        : "Sem preços definidos",
       items: (revision.items ?? []).map((item, index) => ({
         id: item.id ?? `${order.id}:${index}`,
         product: productName(item),
         quantity: quantityLabel(item),
+        unitWeights: unitWeightsLabel(item),
         totalWeight: weightLabel(item),
       })),
     };
@@ -252,6 +271,13 @@ export function buildSeasonalReport(
   const rowCount = parsed.mode === "order_sheets"
     ? orderSheets.length
     : productSections.reduce((total, section) => total + section.rows.length, 0);
+  const selectedProducts = new Set(parsed.productIds);
+  const revenueItems = accepted.flatMap((order) => order.revision?.items ?? []).filter((item) => (
+    parsed.mode === "order_sheets"
+    || !selectedProducts.size
+    || Boolean(item.seasonal_product_id && selectedProducts.has(item.seasonal_product_id))
+  ));
+  const revenue = orderRevenueEstimate(revenueItems);
 
   return {
     mode: parsed.mode,
@@ -264,6 +290,9 @@ export function buildSeasonalReport(
     summary: parsed.mode === "order_sheets"
       ? `${orderSheets.length} ${orderSheets.length === 1 ? "encomenda aceite" : "encomendas aceites"}`
       : `${rowCount} ${rowCount === 1 ? "artigo" : "artigos"}${parsed.productAggregation === "sum" ? " com quantidades somadas" : " por encomenda"}${parsed.separateByDay ? " e por dia" : ""}${parsed.separateByServiceLocation ? " e por local de serviço" : ""}`,
+    revenueSummary: revenue
+      ? `Receita estimada: ${formatCurrency(revenue.totalCents)}${revenue.complete ? "" : " · parcial"}`
+      : "Receita estimada: sem preços definidos",
     rowCount,
     orderSheets,
     productSections,

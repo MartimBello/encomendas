@@ -39,6 +39,8 @@ function order(options: {
   customerPhone?: string | null;
   pickupStoreId?: string;
   pickupStoreName?: string;
+  unitPriceCents?: number | null;
+  estimatedTotalCents?: number | null;
 } = {}): Order {
   const id = options.id ?? "70000000-0000-4000-8000-000000000001";
   const fulfillment = options.fulfillment ?? "pickup";
@@ -89,6 +91,8 @@ function order(options: {
         unit_label: options.unit ?? "un.",
         unit_weights: options.weights ?? [3.2, 3.5],
         unit_weight_label: "kg",
+        unit_price_cents: options.unitPriceCents === undefined ? 1500 : options.unitPriceCents,
+        estimated_total_cents: options.estimatedTotalCents === undefined ? 3000 : options.estimatedTotalCents,
       }],
     },
   };
@@ -124,6 +128,8 @@ describe("seasonal export building", () => {
     expect(report.orderSheets[0]).toMatchObject({
       orderNumber: "SAZ-001",
       fulfillmentLabel: "Levantamento em loja",
+      serviceLocationLabel: "Loja de levantamento",
+      serviceLocation: "Matosinhos",
       serviceDate: "24/12/2026",
       serviceTime: "10:00",
       customerName: "Joana Coração",
@@ -131,7 +137,9 @@ describe("seasonal export building", () => {
       deliveryAddress: null,
     });
     expect(report.orderSheets[1].deliveryAddress).toBe("Avenida Central, Braga");
-    expect(report.orderSheets[0].items[0]).toMatchObject({ product: "Peru · Recheado", quantity: "2 un.", totalWeight: "6,7 kg" });
+    expect(report.orderSheets[0].items[0]).toMatchObject({ product: "Peru · Recheado", quantity: "2 un.", unitWeights: "3,2 kg · 3,5 kg", totalWeight: "6,7 kg" });
+    expect(report.orderSheets[0].estimatedRevenue).toContain("30,00");
+    expect(report.revenueSummary).toContain("60,00");
   });
 
   it("totals products, optionally separates days, and includes only selected products", () => {
@@ -199,6 +207,19 @@ describe("seasonal export building", () => {
     const totals = buildSeasonalReport(campaign, [legacy], defaultSeasonalReportDefinition("product-totals"));
     expect(sheets.orderSheets[0]).toMatchObject({ customerName: "Dados anonimizados", customerPhone: "Não indicado" });
     expect(totals.productSections[0].rows[0].product).toBe("Artigo removido");
+  });
+
+  it("marks revenue estimates as partial when a selected line has no snapshotted price", () => {
+    const unpriced = order({
+      id: "70000000-0000-4000-8000-000000000011",
+      number: "SAZ-011",
+      estimatedTotalCents: null,
+      unitPriceCents: null,
+    });
+    const report = buildSeasonalReport(campaign, [order(), unpriced], defaultSeasonalReportDefinition("product-totals"));
+
+    expect(report.revenueSummary).toContain("30,00");
+    expect(report.revenueSummary).toContain("parcial");
   });
 
   it("paginates order sheets one order at a time and returns useful empty reports", () => {

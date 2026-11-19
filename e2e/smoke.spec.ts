@@ -57,7 +57,7 @@ test("kitchen and admin accounts are routed to their workspaces", async ({ brows
 });
 
 test("seasonal campaigns expose their special menu and pickup ranges", async ({ browser }, testInfo) => {
-  test.setTimeout(120_000);
+  test.setTimeout(300_000);
   const productName = `Produto Playwright ${testInfo.project.name}`;
   const editedProductName = `${productName} editado`;
   const categoryName = `Categoria Playwright ${testInfo.project.name} ${Date.now()}`;
@@ -70,6 +70,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   const catalogProductDialog = admin.getByRole("dialog", { name: "Editar artigo · Bacalhau com natas" });
   await expect(catalogProductDialog.getByLabel("Categoria", { exact: true })).toHaveValue("20000000-0000-4000-8000-000000000001");
   await expect(catalogProductDialog.getByLabel("Descrição")).toHaveValue("Tabuleiro pronto a servir");
+  await expect(catalogProductDialog.getByLabel("Preço por unidade / peso (€)")).toHaveValue("24.99");
   await catalogProductDialog.getByLabel("Nome").fill("Bacalhau com natas editado");
   await catalogProductDialog.getByRole("button", { name: "Guardar alterações" }).click();
   await expect(catalogProductDialog).toBeHidden();
@@ -103,7 +104,8 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(createCampaignDialog).toBeVisible();
   await createCampaignDialog.getByRole("button", { name: "Cancelar" }).click();
   const campaignRow = admin.getByRole("row").filter({ hasText: "Natal — demonstração local" });
-  await campaignRow.getByRole("link", { name: "Editar" }).click();
+  await campaignRow.getByRole("button", { name: "Ações para Natal — demonstração local" }).click();
+  await admin.getByRole("menuitem", { name: "Editar" }).click();
   await expect(admin).toHaveURL(/\/admin\/sazonais\/40000000-0000-4000-8000-000000000001$/);
   await expect(admin.getByRole("heading", { name: "Natal — demonstração local", exact: true })).toBeVisible();
   await expect(admin.getByLabel("Categoria")).toHaveValue("20000000-0000-4000-8000-000000000001");
@@ -116,11 +118,11 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(editDialog).toBeHidden();
   await expect(admin.getByText("Campanha atualizada.")).toBeVisible();
   await expect(admin.getByText("Peru assado", { exact: true })).toBeVisible();
-  await expect(admin.getByRole("heading", { name: "Exportar PDF" })).toBeVisible();
-  await expect(admin.getByRole("link", { name: "Relatórios de encomendas" })).toHaveCount(1);
-  await admin.getByRole("link", { name: "Relatórios de encomendas" }).click();
+  await admin.getByRole("link", { name: "Campanhas" }).click();
+  await campaignRow.getByRole("button", { name: "Ações para Natal — demonstração local" }).click();
+  await admin.getByRole("menuitem", { name: "Relatórios" }).click();
   await expect(admin).toHaveURL(/\/admin\/sazonais\/40000000-0000-4000-8000-000000000001\/relatorios$/);
-  await expect(admin.getByRole("heading", { name: /Exportar · Natal/ })).toBeVisible();
+  await expect(admin.getByRole("heading", { name: /Relatórios · Natal/ })).toBeVisible();
   await expect(admin.getByText("Uma folha por encomenda", { exact: true })).toBeVisible();
   await admin.getByRole("radio", { name: "Artigos" }).click();
   await expect(admin.getByRole("radio", { name: "Somar" })).toBeChecked();
@@ -133,11 +135,14 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
 
   await admin.getByLabel("Nome do artigo").fill(productName);
   await admin.getByLabel("Unidade (quantidade normal)", { exact: true }).fill("un.");
+  await admin.getByLabel("Preço por unidade / peso (€)", { exact: true }).fill("12.34");
   await admin.getByRole("button", { name: "Adicionar artigo" }).click();
   await expect(admin.getByText("Artigo adicionado ao menu especial.")).toBeVisible();
   const productRow = admin.getByRole("row", { name: new RegExp(`Artigo ${productName}`) });
+  await expect(productRow).toContainText("12,34");
   await productRow.getByRole("button", { name: "Editar" }).click();
   const productDialog = admin.getByRole("dialog", { name: `Editar artigo · ${productName}` });
+  await expect(productDialog.getByLabel("Preço por unidade / peso (€)")).toHaveValue("12.34");
   await productDialog.getByLabel("Nome").fill(editedProductName);
   await productDialog.getByLabel("Limite de stock").fill("100");
   await productDialog.getByRole("button", { name: "Guardar alterações" }).click();
@@ -207,6 +212,7 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await store.getByLabel("Telefone").fill("912345678");
   await store.getByRole("button", { name: "Adicionar Peru assado · Com recheio" }).click();
   await store.getByLabel("Unidade 1 (kg)").fill("4");
+  await expect(store.getByText("63,96 €", { exact: true })).toBeVisible();
   await store.getByLabel(/^Observação/).fill("Bem passado");
   await store.getByRole("button", { name: "Enviar encomenda sazonal" }).click();
   await expect(store).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/);
@@ -240,11 +246,13 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await reportingAdmin.getByRole("button", { name: "Pesquisar" }).click();
   await expect(reportingAdmin.getByRole("row").filter({ hasText: seasonalOrderNumber })).toContainText("Sazonal");
   await reportingAdmin.goto("/admin/sazonais/40000000-0000-4000-8000-000000000001/relatorios?preset=order-sheets");
-  await expect(reportingAdmin.getByRole("heading", { name: /Exportar · Natal/ })).toBeVisible();
+  await expect(reportingAdmin.getByRole("heading", { name: /Relatórios · Natal/ })).toBeVisible();
   const reportOrderHeading = reportingAdmin.getByRole("heading", { name: `Encomenda ${seasonalOrderNumber}` });
   if (await reportOrderHeading.count() === 0) await reportingAdmin.getByRole("button", { name: "Seguinte" }).click();
   await expect(reportOrderHeading).toBeVisible();
   await expect(reportingAdmin.getByText(seasonalCustomer, { exact: true })).toBeVisible();
+  await expect(reportingAdmin.getByText("Loja da Boavista", { exact: true }).first()).toBeVisible();
+  await expect(reportingAdmin.getByText("4 kg · 3 kg", { exact: true })).toBeVisible();
   if (testInfo.project.name === "iPad") {
     await expect(reportingAdmin.getByRole("button", { name: "Descarregar PDF" })).toBeEnabled();
   } else {
@@ -283,7 +291,9 @@ test("store creation, kitchen acceptance and cancellation acknowledgment", async
   await expect(page.getByRole("heading", { name: "Acompanhamentos" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Sobremesas" })).toBeVisible();
   await page.getByRole("button", { name: /Bacalhau com natas/ }).click();
+  await expect(page.getByText(/Estimativa: 24,99/)).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("24,99 €", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Enviar à cozinha" }).click();
   await expect(page).toHaveURL(/\/loja\/encomendas\/[0-9a-f-]+$/, { timeout: 15_000 });
   await expect(page.getByText("Rua das Flores, 10, 4000-001 Porto", { exact: true })).toBeVisible();

@@ -35,13 +35,16 @@ function OrderSheetPreview({ report }: { report: SeasonalReportPreview }) {
     <dl className="grid gap-4 rounded-xl bg-muted p-4 sm:grid-cols-2">
       <div><dt className="text-xs font-medium text-muted-foreground">Serviço</dt><dd className="font-medium">{sheet.fulfillmentLabel}</dd></div>
       <div><dt className="text-xs font-medium text-muted-foreground">Data e hora</dt><dd className="font-medium">{sheet.serviceDate} · {sheet.serviceTime}</dd></div>
+      <div><dt className="text-xs font-medium text-muted-foreground">{sheet.serviceLocationLabel}</dt><dd className="font-medium">{sheet.serviceLocation}</dd></div>
+      <div><dt className="text-xs font-medium text-muted-foreground">Loja de origem</dt><dd className="font-medium">{sheet.orderingStore}</dd></div>
       <div><dt className="text-xs font-medium text-muted-foreground">Cliente</dt><dd className="font-medium">{sheet.customerName}</dd></div>
       <div><dt className="text-xs font-medium text-muted-foreground">Telefone</dt><dd className="font-medium">{sheet.customerPhone}</dd></div>
       {sheet.deliveryAddress && <div className="sm:col-span-2"><dt className="text-xs font-medium text-muted-foreground">Morada de entrega</dt><dd className="font-medium">{sheet.deliveryAddress}</dd></div>}
+      <div className="sm:col-span-2"><dt className="text-xs font-medium text-muted-foreground">Total</dt><dd className="font-medium">{sheet.estimatedRevenue}</dd></div>
     </dl>
     <div className="overflow-hidden rounded-xl border">
-      <Table><TableHeader><TableRow><TableHead>Artigo</TableHead><TableHead className="text-right">Quantidade</TableHead><TableHead className="text-right">Peso total</TableHead></TableRow></TableHeader>
-        <TableBody>{sheet.items.map((item) => <TableRow key={item.id}><TableCell>{item.product}</TableCell><TableCell className="text-right">{item.quantity}</TableCell><TableCell className="text-right">{item.totalWeight || "-"}</TableCell></TableRow>)}</TableBody>
+      <Table><TableHeader><TableRow><TableHead>Artigo</TableHead><TableHead className="text-right">Quantidade</TableHead><TableHead className="text-right">Pesos por unidade / total</TableHead></TableRow></TableHeader>
+        <TableBody>{sheet.items.map((item) => <TableRow key={item.id}><TableCell>{item.product}</TableCell><TableCell className="text-right">{item.quantity}</TableCell><TableCell className="text-right">{item.unitWeights ? <><span className="block">{item.unitWeights}</span><span className="block text-xs text-muted-foreground">Total: {item.totalWeight}</span></> : "-"}</TableCell></TableRow>)}</TableBody>
       </Table>
     </div>
   </div>;
@@ -68,7 +71,7 @@ function ReportPreview({ report, loading, onPage }: { report: SeasonalReportPrev
   return <Card className="min-w-0 overflow-hidden">
     <CardHeader className="border-b bg-muted/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><CardTitle>{report.title}</CardTitle><CardDescription>Gerado em {reportGeneratedLabel(report.generatedAt)} · {report.summary}</CardDescription></div>
+        <div><CardTitle>{report.title}</CardTitle><CardDescription>Gerado em {reportGeneratedLabel(report.generatedAt)} · {report.summary}<br />{report.revenueSummary}</CardDescription></div>
         {loading && <LoaderCircle className="animate-spin text-muted-foreground" />}
       </div>
     </CardHeader>

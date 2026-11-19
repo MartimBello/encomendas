@@ -214,6 +214,7 @@ export function ProductForm({ categories }: { categories: { id: string; name: st
       <Field><FieldLabel htmlFor="product-name">Nome</FieldLabel><Input id="product-name" name="name" placeholder="Nome do artigo" required /></Field>
       <Field><FieldLabel htmlFor="product-description">Descrição</FieldLabel><Input id="product-description" name="description" placeholder="Descrição" /></Field>
       <Field><FieldLabel htmlFor="product-unit">Unidade (quantidade normal)</FieldLabel><Input id="product-unit" name="unit_label" defaultValue="un." placeholder="kg, tab., dose…" required /></Field>
+      <Field><FieldLabel htmlFor="product-unit-price">Preço por unidade / peso (€)</FieldLabel><Input id="product-unit-price" name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="Sem preço" /></Field>
       <Field><FieldLabel htmlFor="product-quantity-mode">Forma de escolha</FieldLabel><NativeSelect id="product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
       <Field><FieldLabel htmlFor="product-weight-unit">Unidade do peso individual</FieldLabel><Input id="product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></Field>
       <Field><FieldLabel htmlFor="product-minimum">Quantidade mínima</FieldLabel><Input id="product-minimum" name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
@@ -242,6 +243,7 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
       name: product.name,
       description: product.description,
       unit_label: product.unit_label,
+      unit_price: product.unit_price_cents === null ? "" : product.unit_price_cents / 100,
       minimum_quantity: product.minimum_quantity,
       quantity_step: product.quantity_step,
       quantity_mode: product.quantity_mode,
@@ -262,6 +264,7 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
           <Field><FieldLabel htmlFor={`${fieldId}-name`}>Nome</FieldLabel><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-description`}>Descrição</FieldLabel><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</FieldLabel><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></Field>
+          <Field><FieldLabel htmlFor={`${fieldId}-unit-price`}>Preço por unidade / peso (€)</FieldLabel><Input id={`${fieldId}-unit-price`} name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" defaultValue={product.unit_price_cents === null ? "" : product.unit_price_cents / 100} placeholder="Sem preço" /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</FieldLabel><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</FieldLabel><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-minimum`}>Quantidade mínima</FieldLabel><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></Field>

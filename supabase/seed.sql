@@ -37,12 +37,12 @@ insert into public.product_categories (id, name, position) values
 on conflict (id) do nothing;
 
 insert into public.products (
-  id, category_id, name, description, unit_label, minimum_quantity, quantity_step, requires_note, position
+  id, category_id, name, description, unit_label, minimum_quantity, quantity_step, requires_note, position, unit_price_cents
 ) values
-  ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Bacalhau com natas', 'Tabuleiro pronto a servir', 'tab.', 1, 1, false, 10),
-  ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Vitela assada', 'Indicar o ponto e observações', 'kg', 1, 0.5, true, 20),
-  ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'Arroz de forno', '', 'dose', 1, 1, false, 10),
-  ('30000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000003', 'Pudim caseiro', '', 'un.', 1, 1, false, 10)
+  ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Bacalhau com natas', 'Tabuleiro pronto a servir', 'tab.', 1, 1, false, 10, 2499),
+  ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Vitela assada', 'Indicar o ponto e observações', 'kg', 1, 0.5, true, 20, 1890),
+  ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'Arroz de forno', '', 'dose', 1, 1, false, 10, 450),
+  ('30000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000003', 'Pudim caseiro', '', 'un.', 1, 1, false, 10, 1299)
 on conflict (id) do nothing;
 
 insert into public.pickup_windows (location_id, weekday, opens_at, closes_at, slot_minutes)
@@ -64,10 +64,10 @@ insert into public.seasonal_campaigns (
 
 insert into public.seasonal_products (
   id, campaign_id, category_id, name, description, unit_label, minimum_quantity, quantity_step,
-  quantity_mode, unit_weight_label, variations, requires_note, position
+  quantity_mode, unit_weight_label, variations, requires_note, position, unit_price_cents
 ) values
-  ('41000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Peru assado', 'Peru assado pronto a servir', 'un.', 1, 1, 'unit_weight', 'kg', array['Com recheio', 'Sem recheio'], true, 10),
-  ('41000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003', 'Bolo-rei', 'Receita tradicional', 'un.', 1, 1, 'selection', 'kg', array['Pequeno', 'Grande'], false, 20)
+  ('41000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Peru assado', 'Peru assado pronto a servir', 'un.', 1, 1, 'unit_weight', 'kg', array['Com recheio', 'Sem recheio'], true, 10, 1599),
+  ('41000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003', 'Bolo-rei', 'Receita tradicional', 'un.', 1, 1, 'selection', 'kg', array['Pequeno', 'Grande'], false, 20, 1399)
 on conflict (id) do nothing;
 
 insert into public.seasonal_pickup_slots (

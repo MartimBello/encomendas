@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CalendarClock, Mail, MapPin, Phone, Printer, Store } from "lucide-react";
 import { getOrder } from "@/lib/data";
 import { formatDateTime } from "@/lib/dates";
-import { formatItemQuantity, formatProductName } from "@/lib/utils";
+import { formatCurrency, formatItemQuantity, formatProductName, orderRevenueEstimate } from "@/lib/utils";
 import { StoreOrderActions } from "@/components/order-actions";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -18,6 +18,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
   const { order, revisions } = result;
   const revision = order.revision;
   if (!revision) notFound();
+  const revenue = orderRevenueEstimate(revision.items);
 
   return <>
     <PageHeader
@@ -32,11 +33,11 @@ export default async function OrderDetailPage({ params }: PageProps<"/loja/encom
 
     <div className="grid gap-5 lg:grid-cols-[1fr_.8fr]">
       <Card>
-        <CardHeader><CardTitle>Artigos</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Artigos</CardTitle>{revenue && <p className="text-sm text-muted-foreground">Receita estimada: <span className="font-semibold text-foreground">{formatCurrency(revenue.totalCents)}{revenue.complete ? "" : " · parcial"}</span></p>}</CardHeader>
         <CardContent className="space-y-3">
           {revision.items?.map((item) => <div key={item.id} className="flex justify-between gap-4 border-b pb-3 last:border-0">
             <div><p className="font-semibold">{formatProductName(item.product_name, item.variation_name)}</p>{item.item_note && <p className="text-sm text-muted-foreground">{item.item_note}</p>}</div>
-            <p className="text-right font-semibold">{formatItemQuantity(item)}</p>
+            <div className="text-right"><p className="font-semibold">{formatItemQuantity(item)}</p><p className="text-sm text-muted-foreground">{item.estimated_total_cents === null || item.estimated_total_cents === undefined ? "Sem preço" : formatCurrency(item.estimated_total_cents)}</p></div>
           </div>)}
           {revision.general_notes && <div className="rounded-xl bg-muted p-4 text-sm"><strong>Observações:</strong><p className="mt-1 whitespace-pre-wrap">{revision.general_notes}</p></div>}
         </CardContent>

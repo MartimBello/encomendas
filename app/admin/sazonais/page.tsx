@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { ChartNoAxesColumn, Ellipsis, Pencil } from "lucide-react";
 import { getSeasonalCampaigns } from "@/lib/data";
 import { formatDateTime } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
@@ -7,6 +7,7 @@ import { SeasonalCampaignCreateDialog } from "@/components/seasonal-admin-forms"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function periodState(opens: string, closes: string) {
@@ -41,7 +42,7 @@ export default async function SeasonalAdminPage() {
                 <TableCell><p>{formatDateTime(campaign.ordering_opens_at)}</p><p className="text-xs text-muted-foreground">até {formatDateTime(campaign.ordering_closes_at)}</p></TableCell>
                 <TableCell>{campaign.products?.length ?? 0} artigos · {campaign.pickup_slots?.length ?? 0} levantamentos</TableCell>
                 <TableCell><Badge variant={campaign.active ? state.variant : "outline"}>{campaign.active ? state.label : "Inativa"}</Badge></TableCell>
-                <TableCell className="text-right"><Button asChild size="sm" variant="outline"><Link href={`/admin/sazonais/${campaign.id}`}><Pencil data-icon="inline-start" />Editar</Link></Button></TableCell>
+                <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Ações para ${campaign.name}`}><Ellipsis /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup><DropdownMenuItem asChild><Link href={`/admin/sazonais/${campaign.id}/relatorios`}><ChartNoAxesColumn />Relatórios</Link></DropdownMenuItem><DropdownMenuItem asChild><Link href={`/admin/sazonais/${campaign.id}`}><Pencil />Editar</Link></DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>;
             })}
             {!campaigns.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Ainda não existem campanhas sazonais.</TableCell></TableRow>}
