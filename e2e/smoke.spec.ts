@@ -116,10 +116,19 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(editDialog).toBeHidden();
   await expect(admin.getByText("Campanha atualizada.")).toBeVisible();
   await expect(admin.getByText("Peru assado", { exact: true })).toBeVisible();
-  await expect(admin.getByRole("heading", { name: "Exportações" })).toBeVisible();
-  await expect(admin.getByRole("link", { name: "Artigos por data" })).toBeVisible();
-  await expect(admin.getByRole("link", { name: "Artigos por loja e data" })).toBeVisible();
-  await expect(admin.getByRole("link", { name: "Todas as encomendas" })).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Exportar PDF" })).toBeVisible();
+  await expect(admin.getByRole("link", { name: "Relatórios de encomendas" })).toHaveCount(1);
+  await admin.getByRole("link", { name: "Relatórios de encomendas" }).click();
+  await expect(admin).toHaveURL(/\/admin\/sazonais\/40000000-0000-4000-8000-000000000001\/relatorios$/);
+  await expect(admin.getByRole("heading", { name: /Exportar · Natal/ })).toBeVisible();
+  await expect(admin.getByText("Uma folha por encomenda", { exact: true })).toBeVisible();
+  await admin.getByRole("radio", { name: "Artigos" }).click();
+  await expect(admin.getByRole("radio", { name: "Somar" })).toBeChecked();
+  await expect(admin.getByRole("radio", { name: "Listar" })).not.toBeChecked();
+  await expect(admin.getByLabel("Separar os totais por dia")).not.toBeChecked();
+  await expect(admin.getByText("Sem seleção, são incluídos todos os artigos.")).toBeVisible();
+  await admin.goBack();
+  await expect(admin.getByRole("heading", { name: "Natal — demonstração local", exact: true })).toBeVisible();
 
   await admin.getByLabel("Nome do artigo").fill(productName);
   await admin.getByLabel("Unidade (quantidade normal)", { exact: true }).fill("un.");
@@ -229,6 +238,20 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await reportingAdmin.getByLabel("Pesquisar encomendas").fill(seasonalCustomer);
   await reportingAdmin.getByRole("button", { name: "Pesquisar" }).click();
   await expect(reportingAdmin.getByRole("row").filter({ hasText: seasonalOrderNumber })).toContainText("Sazonal");
+  await reportingAdmin.goto("/admin/sazonais/40000000-0000-4000-8000-000000000001/relatorios?preset=order-sheets");
+  await expect(reportingAdmin.getByRole("heading", { name: /Exportar · Natal/ })).toBeVisible();
+  const reportOrderHeading = reportingAdmin.getByRole("heading", { name: `Encomenda ${seasonalOrderNumber}` });
+  if (await reportOrderHeading.count() === 0) await reportingAdmin.getByRole("button", { name: "Seguinte" }).click();
+  await expect(reportOrderHeading).toBeVisible();
+  await expect(reportingAdmin.getByText(seasonalCustomer, { exact: true })).toBeVisible();
+  if (testInfo.project.name === "iPad") {
+    await expect(reportingAdmin.getByRole("button", { name: "Descarregar PDF" })).toBeEnabled();
+  } else {
+    const downloadPromise = reportingAdmin.waitForEvent("download");
+    await reportingAdmin.getByRole("button", { name: "Descarregar PDF" }).click();
+    const reportDownload = await downloadPromise;
+    expect(reportDownload.suggestedFilename()).toMatch(/^natal-demonstracao-local-folhas-encomendas-\d{4}-\d{2}-\d{2}\.pdf$/);
+  }
   await reportingAdmin.close();
 });
 
