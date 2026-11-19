@@ -15,6 +15,7 @@ const ids = {
   campaign: "40000000-0000-4000-8000-000000000001",
   origin: "10000000-0000-4000-8000-000000000001",
   pickup: "10000000-0000-4000-8000-000000000002",
+  pickupSecond: "10000000-0000-4000-8000-000000000003",
   turkey: "50000000-0000-4000-8000-000000000001",
   cod: "50000000-0000-4000-8000-000000000002",
 };
@@ -36,15 +37,19 @@ function order(options: {
   address?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
+  pickupStoreId?: string;
+  pickupStoreName?: string;
 } = {}): Order {
   const id = options.id ?? "70000000-0000-4000-8000-000000000001";
   const fulfillment = options.fulfillment ?? "pickup";
+  const pickupStoreId = options.pickupStoreId ?? ids.pickup;
+  const pickupStoreName = options.pickupStoreName ?? "Matosinhos";
   return {
     id,
     order_number: options.number ?? "SAZ-001",
     campaign_id: ids.campaign,
     ordering_store_id: ids.origin,
-    pickup_store_id: fulfillment === "pickup" ? ids.pickup : null,
+    pickup_store_id: fulfillment === "pickup" ? pickupStoreId : null,
     status: options.status ?? "accepted",
     current_version: 2,
     current_revision_id: "80000000-0000-4000-8000-000000000001",
@@ -58,7 +63,7 @@ function order(options: {
     created_at: "2026-12-19T10:00:00Z",
     updated_at: "2026-12-20T10:00:00Z",
     ordering_store: { id: ids.origin, name: "Boavista", address: "" },
-    pickup_store: fulfillment === "pickup" ? { id: ids.pickup, name: "Matosinhos", address: "" } : null,
+    pickup_store: fulfillment === "pickup" ? { id: pickupStoreId, name: pickupStoreName, address: "" } : null,
     campaign: { id: ids.campaign, name: campaign.name, slug: campaign.slug },
     revision: {
       id: "80000000-0000-4000-8000-000000000001",
@@ -67,7 +72,7 @@ function order(options: {
       customer_name: options.customerName === undefined ? "Joana Coração" : options.customerName,
       customer_email: "joana@example.pt",
       customer_phone: options.customerPhone === undefined ? "912345678" : options.customerPhone,
-      pickup_store_id: fulfillment === "pickup" ? ids.pickup : null,
+      pickup_store_id: fulfillment === "pickup" ? pickupStoreId : null,
       pickup_at: options.date ?? "2026-12-24T10:00:00Z",
       fulfillment_type: fulfillment,
       delivery_address: fulfillment === "delivery" ? options.address ?? "Rua das Flores, Porto" : null,
@@ -91,14 +96,15 @@ function order(options: {
 
 describe("seasonal export definition", () => {
   it("has only the two focused export modes", () => {
-    expect(defaultSeasonalReportDefinition()).toEqual({ version: 3, mode: "order_sheets", separateByDay: false, productIds: [], productAggregation: "sum" });
-    expect(defaultSeasonalReportDefinition("product-totals-day")).toEqual({ version: 3, mode: "product_totals", separateByDay: true, productIds: [], productAggregation: "sum" });
+    expect(defaultSeasonalReportDefinition()).toEqual({ version: 4, mode: "order_sheets", separateByDay: false, separateByServiceLocation: false, productIds: [], productAggregation: "sum" });
+    expect(defaultSeasonalReportDefinition("product-totals-day")).toEqual({ version: 4, mode: "product_totals", separateByDay: true, separateByServiceLocation: false, productIds: [], productAggregation: "sum" });
     expect(seasonalReportDefinitionSchema.safeParse(defaultSeasonalReportDefinition()).success).toBe(true);
   });
 
   it("rejects duplicate products and product options on order sheets", () => {
-    expect(seasonalReportDefinitionSchema.safeParse({ version: 3, mode: "product_totals", separateByDay: false, productIds: [ids.turkey, ids.turkey], productAggregation: "sum" }).success).toBe(false);
-    expect(seasonalReportDefinitionSchema.safeParse({ version: 3, mode: "order_sheets", separateByDay: true, productIds: [], productAggregation: "sum" }).success).toBe(false);
+    expect(seasonalReportDefinitionSchema.safeParse({ version: 4, mode: "product_totals", separateByDay: false, separateByServiceLocation: false, productIds: [ids.turkey, ids.turkey], productAggregation: "sum" }).success).toBe(false);
+    expect(seasonalReportDefinitionSchema.safeParse({ version: 4, mode: "order_sheets", separateByDay: true, separateByServiceLocation: false, productIds: [], productAggregation: "sum" }).success).toBe(false);
+    expect(seasonalReportDefinitionSchema.safeParse({ version: 4, mode: "order_sheets", separateByDay: false, separateByServiceLocation: true, productIds: [], productAggregation: "sum" }).success).toBe(false);
   });
 });
 
@@ -162,6 +168,31 @@ describe("seasonal export building", () => {
     });
   });
 
+  it("separates product totals by pickup store and home delivery", () => {
+    const secondStore = order({
+      id: "70000000-0000-4000-8000-000000000009",
+      number: "SAZ-009",
+      pickupStoreId: ids.pickupSecond,
+      pickupStoreName: "Gaia",
+      quantity: 3,
+    });
+    const delivery = order({
+      id: "70000000-0000-4000-8000-000000000010",
+      number: "SAZ-010",
+      fulfillment: "delivery",
+      quantity: 1,
+    });
+    const definition = { ...defaultSeasonalReportDefinition("product-totals"), separateByServiceLocation: true };
+    const report = buildSeasonalReport(campaign, [order(), secondStore, delivery], definition);
+
+    expect(report.productSections.map((section) => ({ title: section.title, quantity: section.rows[0].quantity }))).toEqual([
+      { title: "Entrega ao domicílio", quantity: "1 un." },
+      { title: "Levantamento em Gaia", quantity: "3 un." },
+      { title: "Levantamento em Matosinhos", quantity: "2 un." },
+    ]);
+    expect(report.summary).toContain("por local de serviço");
+  });
+
   it("keeps snapshotted product names when a product reference was removed and handles anonymized clients", () => {
     const legacy = order({ productId: null, productName: "Artigo removido", variation: "", customerName: null, customerPhone: null });
     const sheets = buildSeasonalReport(campaign, [legacy], defaultSeasonalReportDefinition());
@@ -189,7 +220,12 @@ describe("seasonal export PDF", () => {
       order({ id: "70000000-0000-4000-8000-000000000007", number: "SAZ-007", fulfillment: "delivery", date: "2026-12-25T12:30:00Z", customerName: "Manuel Silva" }),
     ];
     const sheets = buildSeasonalReport(campaign, orders, defaultSeasonalReportDefinition(), "2026-12-21T12:00:00Z");
-    const totals = buildSeasonalReport(campaign, orders, defaultSeasonalReportDefinition("product-totals-day"), "2026-12-21T12:00:00Z");
+    const totalsDefinition = { ...defaultSeasonalReportDefinition("product-totals-day"), separateByServiceLocation: true };
+    const totals = buildSeasonalReport(campaign, orders, totalsDefinition, "2026-12-21T12:00:00Z");
+    expect(totals.productSections.map((section) => section.title)).toEqual([
+      "24/12/2026 · Levantamento em Matosinhos",
+      "25/12/2026 · Entrega ao domicílio",
+    ]);
     const listDefinition = { ...defaultSeasonalReportDefinition("product-totals"), productAggregation: "order_list" as const };
     const list = buildSeasonalReport(campaign, orders, listDefinition, "2026-12-21T12:00:00Z");
     const [sheetsPdf, totalsPdf, listPdf] = await Promise.all([renderSeasonalReportPdf(sheets), renderSeasonalReportPdf(totals), renderSeasonalReportPdf(list)]);
