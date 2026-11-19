@@ -18,6 +18,7 @@ function configuredSupabaseSources() {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", ...remoteDevelopmentHosts],
+  serverExternalPackages: ["pdfkit"],
   async headers() {
     const isDevelopment = process.env.NODE_ENV !== "production";
     const scriptSrc = isDevelopment ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
