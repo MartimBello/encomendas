@@ -153,6 +153,7 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
       <Label htmlFor="season-product-unit">Unidade (quantidade normal)</Label>
       <Input id="season-product-unit" name="unit_label" defaultValue="un." placeholder="kg, dose…" required />
     </div>
+    <Field><FieldLabel htmlFor="season-product-unit-price">Preço por unidade / peso (€)</FieldLabel><Input id="season-product-unit-price" name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="Sem preço" /></Field>
     <div className="flex flex-col gap-2"><Label htmlFor="season-product-quantity-mode">Forma de escolha</Label><NativeSelect id="season-product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
     <div className="flex flex-col gap-2"><Label htmlFor="season-product-weight-unit">Unidade do peso individual</Label><Input id="season-product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></div>
     <div className="flex flex-col gap-2">
@@ -193,6 +194,7 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
       name: product.name,
       description: product.description,
       unit_label: product.unit_label,
+      unit_price: product.unit_price_cents === null ? "" : product.unit_price_cents / 100,
       minimum_quantity: product.minimum_quantity,
       quantity_step: product.quantity_step,
       quantity_mode: product.quantity_mode,
@@ -213,6 +215,7 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-description`}>Descrição</Label><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</Label><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></div>
+        <Field><FieldLabel htmlFor={`${fieldId}-unit-price`}>Preço por unidade / peso (€)</FieldLabel><Input id={`${fieldId}-unit-price`} name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" defaultValue={product.unit_price_cents === null ? "" : product.unit_price_cents / 100} placeholder="Sem preço" /></Field>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</Label><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</Label><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-minimum`}>Quantidade mínima</Label><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></div>

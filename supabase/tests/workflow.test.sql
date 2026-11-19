@@ -1,10 +1,14 @@
 begin;
-select plan(46);
+select plan(51);
 truncate table public.orders cascade;
 
 update public.products
-set variations = array['Com recheio', 'Sem recheio']
+set variations = array['Com recheio', 'Sem recheio'], unit_price_cents = 1299
 where id = '30000000-0000-4000-8000-000000000001';
+
+update public.products
+set quantity_mode = 'unit_weight', unit_weight_label = 'kg', unit_price_cents = 2500
+where id = '30000000-0000-4000-8000-000000000004';
 
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000a002","role":"authenticated"}';
 
@@ -48,6 +52,8 @@ select is((select count(*)::integer from public.order_events where event_type = 
 select is((select count(*)::integer from public.notification_outbox where kind = 'new_order'), 1, 'new order push is queued');
 select is((select count(*)::integer from public.order_items), 2, 'different variations of the same product create separate order lines');
 select is((select string_agg(variation_name, ', ' order by variation_name) from public.order_items), 'Com recheio, Sem recheio', 'regular order lines snapshot their selected variations');
+select is((select min(unit_price_cents) from public.order_items), 1299, 'regular order lines snapshot the catalog price');
+select is((select sum(estimated_total_cents)::bigint from public.order_items), 2598::bigint, 'regular order lines snapshot their estimated revenue');
 
 select is(
   public.create_order(
@@ -196,6 +202,21 @@ select lives_ok(
 );
 select is((select pickup_store_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440098'), null::uuid, 'delivery order has no pickup store');
 select is((select pickup_store_id from public.order_revisions where order_id = (select id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440098')), null::uuid, 'delivery revision has no pickup store');
+
+select lives_ok(
+  $$ select public.create_order(
+    '550e8400-e29b-41d4-a716-446655440102',
+    'Cliente Peso', 'peso@example.pt', '912345678',
+    '10000000-0000-4000-8000-000000000003',
+    ((date_trunc('week', now() at time zone 'Europe/Lisbon') + interval '2 weeks 10 hours') at time zone 'Europe/Lisbon'),
+    '',
+    '[{"product_id":"30000000-0000-4000-8000-000000000004","quantity":2,"unit_weights":[2.2,2.8],"note":""}]'::jsonb,
+    'pickup', null, null
+  ) $$,
+  'store can create a weighed order with a priced product'
+);
+select is((select unit_price_cents from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440102')), 2500, 'weighed order line snapshots its price per weight unit');
+select is((select estimated_total_cents from public.order_items where revision_id = (select current_revision_id from public.orders where idempotency_key = '550e8400-e29b-41d4-a716-446655440102')), 12500::bigint, 'weighed order revenue uses the sum of individual weights');
 
 select * from finish();
 rollback;

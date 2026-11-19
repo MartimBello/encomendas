@@ -48,6 +48,7 @@ export interface Product {
   quantity_step: number;
   quantity_mode: ProductQuantityMode;
   unit_weight_label: string;
+  unit_price_cents: number | null;
   variations: string[];
   requires_note: boolean;
   active: boolean;
@@ -104,6 +105,7 @@ export interface SeasonalProduct {
   quantity_step: number;
   quantity_mode: ProductQuantityMode;
   unit_weight_label: string;
+  unit_price_cents: number | null;
   variations: string[];
   stock_limit: number | null;
   requires_note: boolean;
@@ -134,6 +136,8 @@ export interface OrderItem {
   quantity: number;
   unit_weights?: number[];
   unit_weight_label?: string;
+  unit_price_cents?: number | null;
+  estimated_total_cents?: number | null;
   item_note?: string;
   note?: string;
   position?: number;

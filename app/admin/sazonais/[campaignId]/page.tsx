@@ -6,9 +6,8 @@ import { getSeasonalCampaign } from "@/lib/data";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import type { Location } from "@/lib/domain";
 import { createClient } from "@/lib/supabase/server";
-import { formatQuantity } from "@/lib/utils";
+import { formatCurrency, formatQuantity } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
-import { SeasonalExportPanel } from "@/components/seasonal-export-panel";
 import { SeasonalCampaignEditForm, SeasonalDeleteButton, SeasonalPickupSlotEditForm, SeasonalPickupSlotForm, SeasonalProductEditForm, SeasonalProductForm, SeasonalToggleButton } from "@/components/seasonal-admin-forms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,10 +67,10 @@ export default async function SeasonalCampaignPage({ params }: { params: Promise
           <SeasonalProductForm campaignId={campaign.id} categories={categories ?? []} />
           <Separator />
           <Table>
-            <TableHeader><TableRow><TableHead>Artigo</TableHead><TableHead>Quantidade</TableHead><TableHead>Stock</TableHead><TableHead>Estado</TableHead><TableHead><span className="sr-only">Ações</span></TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Artigo</TableHead><TableHead>Quantidade</TableHead><TableHead>Preço</TableHead><TableHead>Stock</TableHead><TableHead>Estado</TableHead><TableHead><span className="sr-only">Ações</span></TableHead></TableRow></TableHeader>
             <TableBody>
-              {products.map((product) => <TableRow key={product.id} aria-label={`Artigo ${product.name}`}><TableCell><p className="font-medium">{product.name}</p><p className="text-xs text-muted-foreground">{product.category?.name ?? "Outros"}{product.requires_note ? " · nota obrigatória" : ""}</p>{product.variations.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Opções: {product.variations.join(" · ")}</p>}</TableCell><TableCell>{product.quantity_mode === "selection" ? "Seleção por opção" : product.quantity_mode === "unit_weight" ? `mín. ${formatQuantity(product.minimum_quantity)} un. · peso em ${product.unit_weight_label}` : `mín. ${formatQuantity(product.minimum_quantity)} · passo ${formatQuantity(product.quantity_step)} ${product.unit_label}`}</TableCell><TableCell>{product.stock_limit !== null ? formatQuantity(product.stock_limit) : "Sem limite"}</TableCell><TableCell><Badge variant={product.active ? "accepted" : "cancelled"}>{product.active ? "Ativo" : "Inativo"}</Badge></TableCell><TableCell><div className="flex flex-wrap justify-end gap-2"><SeasonalProductEditForm product={product} categories={categories ?? []} /><SeasonalToggleButton kind="product" id={product.id} active={product.active} /><SeasonalDeleteButton kind="product" id={product.id} name={product.name} /></div></TableCell></TableRow>)}
-              {!products.length && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Ainda não existem artigos nesta campanha.</TableCell></TableRow>}
+              {products.map((product) => <TableRow key={product.id} aria-label={`Artigo ${product.name}`}><TableCell><p className="font-medium">{product.name}</p><p className="text-xs text-muted-foreground">{product.category?.name ?? "Outros"}{product.requires_note ? " · nota obrigatória" : ""}</p>{product.variations.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Opções: {product.variations.join(" · ")}</p>}</TableCell><TableCell>{product.quantity_mode === "selection" ? "Seleção por opção" : product.quantity_mode === "unit_weight" ? `mín. ${formatQuantity(product.minimum_quantity)} un. · peso em ${product.unit_weight_label}` : `mín. ${formatQuantity(product.minimum_quantity)} · passo ${formatQuantity(product.quantity_step)} ${product.unit_label}`}</TableCell><TableCell>{product.unit_price_cents === null ? "Sem preço" : <><p className="font-medium">{formatCurrency(product.unit_price_cents)}</p><p className="text-xs text-muted-foreground">por {product.quantity_mode === "unit_weight" ? product.unit_weight_label : product.quantity_mode === "selection" ? "seleção" : product.unit_label}</p></>}</TableCell><TableCell>{product.stock_limit !== null ? formatQuantity(product.stock_limit) : "Sem limite"}</TableCell><TableCell><Badge variant={product.active ? "accepted" : "cancelled"}>{product.active ? "Ativo" : "Inativo"}</Badge></TableCell><TableCell><div className="flex flex-wrap justify-end gap-2"><SeasonalProductEditForm product={product} categories={categories ?? []} /><SeasonalToggleButton kind="product" id={product.id} active={product.active} /><SeasonalDeleteButton kind="product" id={product.id} name={product.name} /></div></TableCell></TableRow>)}
+              {!products.length && <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Ainda não existem artigos nesta campanha.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -91,8 +90,6 @@ export default async function SeasonalCampaignPage({ params }: { params: Promise
           </Table>
         </CardContent>
       </Card>
-
-      <SeasonalExportPanel campaign={campaign} />
     </div>
   </>;
 }
