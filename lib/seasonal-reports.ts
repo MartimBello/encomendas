@@ -8,9 +8,10 @@ export type SeasonalReportMode = (typeof reportModes)[number];
 export type SeasonalProductAggregation = "sum" | "order_list";
 
 export type SeasonalReportDefinition = {
-  version: 3;
+  version: 4;
   mode: SeasonalReportMode;
   separateByDay: boolean;
+  separateByServiceLocation: boolean;
   productIds: string[];
   productAggregation: SeasonalProductAggregation;
 };
@@ -68,17 +69,18 @@ export type SeasonalReportPreview = SeasonalReportView & {
 };
 
 export const seasonalReportDefinitionSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   mode: z.enum(reportModes),
   separateByDay: z.boolean(),
+  separateByServiceLocation: z.boolean(),
   productIds: z.array(z.uuid()),
   productAggregation: z.enum(["sum", "order_list"]),
 }).superRefine((definition, context) => {
   if (new Set(definition.productIds).size !== definition.productIds.length) {
     context.addIssue({ code: "custom", path: ["productIds"], message: "Os artigos não podem repetir-se." });
   }
-  if (definition.mode === "order_sheets" && (definition.separateByDay || definition.productIds.length || definition.productAggregation !== "sum")) {
-    context.addIssue({ code: "custom", message: "As opções de artigo e dia aplicam-se apenas aos totais por artigo." });
+  if (definition.mode === "order_sheets" && (definition.separateByDay || definition.separateByServiceLocation || definition.productIds.length || definition.productAggregation !== "sum")) {
+    context.addIssue({ code: "custom", message: "As opções de artigo, dia e local de serviço aplicam-se apenas aos totais por artigo." });
   }
 });
 
@@ -90,9 +92,10 @@ export const seasonalReportPreviewRequestSchema = z.object({
 export function defaultSeasonalReportDefinition(preset?: string): SeasonalReportDefinition {
   const totals = preset === "product-totals" || preset === "product-totals-day";
   return {
-    version: 3,
+    version: 4,
     mode: totals ? "product_totals" : "order_sheets",
     separateByDay: preset === "product-totals-day",
+    separateByServiceLocation: false,
     productIds: [],
     productAggregation: "sum",
   };
@@ -116,6 +119,15 @@ function weightLabel(item: OrderItem, weight = totalWeight(item)) {
 
 function fulfillmentLabel(order: Order) {
   return order.revision?.fulfillment_type === "delivery" ? "Entrega em casa" : "Levantamento em loja";
+}
+
+function serviceLocation(order: Order) {
+  if (order.revision?.fulfillment_type === "delivery") {
+    return { key: "delivery", label: "Entrega ao domicílio" };
+  }
+  const storeId = order.pickup_store?.id ?? order.revision?.pickup_store_id ?? order.pickup_store_id ?? "unknown";
+  const storeName = order.pickup_store?.name ?? "Loja desconhecida";
+  return { key: `pickup:${storeId}`, label: `Levantamento em ${storeName}` };
 }
 
 function acceptedOrders(orders: Order[]) {
@@ -154,27 +166,43 @@ function buildOrderSheets(orders: Order[]): SeasonalOrderSheet[] {
 
 function buildProductSections(orders: Order[], definition: SeasonalReportDefinition): SeasonalProductTotalSection[] {
   const selected = new Set(definition.productIds);
-  const grouped = new Map<string, { order: Order; item: OrderItem }[]>();
+  const grouped = new Map<string, {
+    date: string | null;
+    locationLabel: string | null;
+    lines: { order: Order; item: OrderItem }[];
+  }>();
 
   for (const order of orders) {
     const serviceDate = pickupSlotParts(order.revision!.pickup_at).date;
+    const location = serviceLocation(order);
     for (const item of order.revision!.items ?? []) {
       if (selected.size && (!item.seasonal_product_id || !selected.has(item.seasonal_product_id))) continue;
-      const key = definition.separateByDay ? serviceDate : "all";
-      grouped.set(key, [...(grouped.get(key) ?? []), { order, item }]);
+      const date = definition.separateByDay ? serviceDate : null;
+      const locationKey = definition.separateByServiceLocation ? location.key : null;
+      const key = JSON.stringify([date, locationKey]);
+      const group = grouped.get(key) ?? {
+        date,
+        locationLabel: definition.separateByServiceLocation ? location.label : null,
+        lines: [],
+      };
+      group.lines.push({ order, item });
+      grouped.set(key, group);
     }
   }
 
   return [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, lines]) => {
+    .sort(([, left], [, right]) => {
+      const byDate = (left.date ?? "").localeCompare(right.date ?? "");
+      return byDate || (left.locationLabel ?? "").localeCompare(right.locationLabel ?? "", "pt", { numeric: true });
+    })
+    .map(([key, group]) => {
       const totals = new Map<string, {
         product: string;
         quantity: number;
         unit: string;
         orders: Map<string, { clientName: string; quantity: number }>;
       }>();
-      for (const { order, item } of lines) {
+      for (const { order, item } of group.lines) {
         const name = productName(item);
         const unit = item.unit_label?.trim() || "un.";
         const totalKey = JSON.stringify([item.seasonal_product_id ?? name, name, unit]);
@@ -202,7 +230,10 @@ function buildProductSections(orders: Order[], definition: SeasonalReportDefinit
         .sort((left, right) => left.product.localeCompare(right.product, "pt", { numeric: true }));
       return {
         key,
-        title: definition.separateByDay ? formatDate(`${key}T12:00:00Z`) : null,
+        title: [
+          group.date ? formatDate(`${group.date}T12:00:00Z`) : null,
+          group.locationLabel,
+        ].filter(Boolean).join(" · ") || null,
         rows,
       };
     });
@@ -232,7 +263,7 @@ export function buildSeasonalReport(
     generatedAt,
     summary: parsed.mode === "order_sheets"
       ? `${orderSheets.length} ${orderSheets.length === 1 ? "encomenda aceite" : "encomendas aceites"}`
-      : `${rowCount} ${rowCount === 1 ? "artigo" : "artigos"}${parsed.productAggregation === "sum" ? " com quantidades somadas" : " por encomenda"}${parsed.separateByDay ? " e por dia" : ""}`,
+      : `${rowCount} ${rowCount === 1 ? "artigo" : "artigos"}${parsed.productAggregation === "sum" ? " com quantidades somadas" : " por encomenda"}${parsed.separateByDay ? " e por dia" : ""}${parsed.separateByServiceLocation ? " e por local de serviço" : ""}`,
     rowCount,
     orderSheets,
     productSections,
