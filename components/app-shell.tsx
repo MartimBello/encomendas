@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, BellRing, ChefHat, ClipboardCheck, ClipboardList, Gift, LogOut, MapPinned, PackageSearch, Settings, ShoppingBag, Store, Users } from "lucide-react";
+import { Archive, BellRing, ChefHat, ClipboardCheck, ClipboardList, Gift, LogOut, MapPinned, PackageSearch, Settings, ShoppingBag, Store, Users, UtensilsCrossed } from "lucide-react";
 import { signOutAction } from "@/app/auth/actions";
 import type { AppRole, Profile } from "@/lib/domain";
 import { roleLabels } from "@/lib/domain";
@@ -20,7 +20,7 @@ type NavigationItem = {
 const navigation: Record<AppRole, NavigationItem[]> = {
   store: [
     { href: "/loja/encomendas", label: "Encomendas", icon: ClipboardList },
-    { href: "/loja/encomendas/nova", label: "Nova", icon: ShoppingBag },
+    { href: "/loja/ementa", label: "Ementa", icon: UtensilsCrossed },
     { href: "/loja/sazonais", label: "Sazonais", icon: Gift },
   ],
   kitchen: [

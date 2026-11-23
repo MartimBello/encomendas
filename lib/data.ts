@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Location, NotificationJob, Order, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product, SeasonalCampaign } from "@/lib/domain";
+import type { Location, NotificationJob, Order, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product, SeasonalCampaign, WeeklyMenuOrder } from "@/lib/domain";
 
 const orderListSelect = `
   id, order_number, campaign_id, ordering_store_id, pickup_store_id, status, current_version,
@@ -12,6 +12,19 @@ const orderListSelect = `
   campaign:seasonal_campaigns(id,name,slug),
   revision:order_revisions!orders_current_revision_fk(id,order_id,version,customer_name,customer_email,customer_phone,pickup_store_id,pickup_at,fulfillment_type,delivery_address,general_notes,created_at,anonymized_at)
 `;
+
+export async function getWeeklyMenuOrder(referenceDate: string) {
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("weekly_menu_orders")
+    .select("*, items:weekly_menu_order_items(*)")
+    .eq("reference_date", referenceDate)
+    .order("position", { referencedTable: "weekly_menu_order_items" })
+    .maybeSingle();
+  if (error) throw error;
+  return data as unknown as WeeklyMenuOrder | null;
+}
 
 export async function getOrders(options?: { status?: string; search?: string; limit?: number; kind?: "regular" | "seasonal" }) {
   const supabase = await createClient();

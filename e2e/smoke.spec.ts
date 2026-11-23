@@ -25,6 +25,25 @@ test("store account reaches the order list and cannot open admin", async ({ page
   await expect(page.getByRole("heading", { name: "Sem acesso a esta área" })).toBeVisible();
 });
 
+test("store saves and revises weekly menu quantities", async ({ page }, testInfo) => {
+  await login(page, "loja@encomendas.local");
+  await page.goto("/loja/ementa");
+  await expect(page.getByRole("heading", { name: "Ementa semanal" })).toBeVisible();
+
+  const firstBoxP = page.getByLabel("Box P").first();
+  const boxQuantity = testInfo.project.name === "iPad" ? "2" : "3";
+  await firstBoxP.fill(boxQuantity);
+  await page.getByRole("button", { name: "Guardar encomenda" }).click();
+  await expect(page.getByText("Quantidades guardadas.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Box P").first()).toHaveValue(boxQuantity);
+  const firstPirex = page.getByLabel("Pirex", { exact: true }).first();
+  await firstPirex.click();
+  await expect(page.getByLabel("Box P").first()).toBeDisabled();
+  await expect(page.getByLabel("Qtd. Pirex").first()).toHaveValue("1");
+});
+
 test("kitchen and admin accounts are routed to their workspaces", async ({ browser }) => {
   const kitchen = await browser.newPage();
   await login(kitchen, "cozinha@encomendas.local");

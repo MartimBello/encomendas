@@ -367,6 +367,46 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"weekly_menu_order_items": {
+                  Row: {
+                    "box_m_quantity": number,"box_p_quantity": number,"category_key": string,"category_label": string,"created_at": string,"day_key": string,"day_label": string,"dish_name": string,"id": string,"order_id": string,"pirex_quantity": number | null,"position": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key": string,"category_label": string,"created_at"?: string,"day_key": string,"day_label": string,"dish_name": string,"id"?: string,"order_id": string,"pirex_quantity"?: number | null,"position"?: number
+                  }
+                  Update: {
+                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key"?: string,"category_label"?: string,"created_at"?: string,"day_key"?: string,"day_label"?: string,"dish_name"?: string,"id"?: string,"order_id"?: string,"pirex_quantity"?: number | null,"position"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weekly_menu_order_items_order_id_fkey"
+      columns: ["order_id"]
+isOneToOne: false
+      referencedRelation: "weekly_menu_orders"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"weekly_menu_orders": {
+                  Row: {
+                    "created_at": string,"created_by": string,"id": string,"menu_title": string,"reference_date": string,"source_updated_at": string,"store_id": string,"updated_at": string,"updated_by": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by": string,"id"?: string,"menu_title": string,"reference_date": string,"source_updated_at": string,"store_id": string,"updated_at"?: string,"updated_by": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string,"id"?: string,"menu_title"?: string,"reference_date"?: string,"source_updated_at"?: string,"store_id"?: string,"updated_at"?: string,"updated_by"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weekly_menu_orders_store_id_fkey"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -451,6 +491,9 @@ isOneToOne: false
               "order_id": string
             }[]
                           },
+"save_weekly_menu_order":
+{ Args: { "p_items": Json,"p_menu_title": string,"p_reference_date": string,"p_source_updated_at": string }; Returns: string
+                           },
 "submit_order_revision":
 { Args: { "p_customer_email": string,"p_customer_name": string,"p_customer_phone": string,"p_delivery_address": string,"p_fulfillment_type": string,"p_general_notes": string,"p_items": Json,"p_order_id": string,"p_pickup_at": string,"p_pickup_store_id": string | null }; Returns: number
                            },
