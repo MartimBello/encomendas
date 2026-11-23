@@ -369,14 +369,14 @@ isOneToOne: false
                   ]
                 },"weekly_menu_order_items": {
                   Row: {
-                    "box_m_quantity": number,"box_p_quantity": number,"category_key": string,"category_label": string,"created_at": string,"day_key": string,"day_label": string,"dish_name": string,"id": string,"order_id": string,"pirex_quantity": number | null,"position": number
+                    "box_m_quantity": number,"box_p_quantity": number,"category_key": string,"category_label": string,"created_at": string,"day_key": string,"day_label": string,"dish_name": string,"id": string,"not_required": boolean,"order_id": string,"pirex_quantity": number | null,"position": number,"unit_quantity": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key": string,"category_label": string,"created_at"?: string,"day_key": string,"day_label": string,"dish_name": string,"id"?: string,"order_id": string,"pirex_quantity"?: number | null,"position"?: number
+                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key": string,"category_label": string,"created_at"?: string,"day_key": string,"day_label": string,"dish_name": string,"id"?: string,"not_required"?: boolean,"order_id": string,"pirex_quantity"?: number | null,"position"?: number,"unit_quantity"?: number | null
                   }
                   Update: {
-                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key"?: string,"category_label"?: string,"created_at"?: string,"day_key"?: string,"day_label"?: string,"dish_name"?: string,"id"?: string,"order_id"?: string,"pirex_quantity"?: number | null,"position"?: number
+                    "box_m_quantity"?: number,"box_p_quantity"?: number,"category_key"?: string,"category_label"?: string,"created_at"?: string,"day_key"?: string,"day_label"?: string,"dish_name"?: string,"id"?: string,"not_required"?: boolean,"order_id"?: string,"pirex_quantity"?: number | null,"position"?: number,"unit_quantity"?: number | null
                   }
                   Relationships: [
                     {

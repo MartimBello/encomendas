@@ -52,23 +52,49 @@ describe("weekly menu schemas", () => {
     });
   });
 
-  it("accepts either box quantities or a Pirex quantity", () => {
+  it("accepts box, Pirex, or unit quantities", () => {
     const boxes = weeklyMenuOrderPayloadSchema.safeParse({
       reference_date: "2026-11-23",
-      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 2, box_m_quantity: 1, pirex_quantity: null }],
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 2, box_m_quantity: 1, pirex_quantity: null, unit_quantity: null, not_required: false }],
     });
     const pirex = weeklyMenuOrderPayloadSchema.safeParse({
       reference_date: "2026-11-23",
-      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: 3 }],
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: 3, unit_quantity: null, not_required: false }],
+    });
+    const units = weeklyMenuOrderPayloadSchema.safeParse({
+      reference_date: "2026-11-23",
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: null, unit_quantity: 4, not_required: false }],
+    });
+    const notRequired = weeklyMenuOrderPayloadSchema.safeParse({
+      reference_date: "2026-11-23",
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: null, unit_quantity: null, not_required: true }],
     });
     expect(boxes.success).toBe(true);
     expect(pirex.success).toBe(true);
+    expect(units.success).toBe(true);
+    expect(notRequired.success).toBe(true);
   });
 
   it("rejects mixed box and Pirex quantities", () => {
     const result = weeklyMenuOrderPayloadSchema.safeParse({
       reference_date: "2026-11-23",
-      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 1, box_m_quantity: 0, pirex_quantity: 2 }],
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 1, box_m_quantity: 0, pirex_quantity: 2, unit_quantity: null, not_required: false }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects selecting Pirex and units at the same time", () => {
+    const result = weeklyMenuOrderPayloadSchema.safeParse({
+      reference_date: "2026-11-23",
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: 2, unit_quantity: 3, not_required: false }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects marking a product unnecessary together with a quantity", () => {
+    const result = weeklyMenuOrderPayloadSchema.safeParse({
+      reference_date: "2026-11-23",
+      items: [{ day_key: "segunda", category_key: "carne", dish_name: "Panados", box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: null, unit_quantity: 3, not_required: true }],
     });
     expect(result.success).toBe(false);
   });

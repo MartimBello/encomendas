@@ -24,12 +24,17 @@ export const weeklyMenuOrderItemSchema = z.object({
   box_p_quantity: quantitySchema,
   box_m_quantity: quantitySchema,
   pirex_quantity: z.number().int().min(1).max(9999).nullable(),
+  unit_quantity: z.number().int().min(1).max(9999).nullable(),
+  not_required: z.boolean(),
 }).superRefine((item, context) => {
-  if (item.pirex_quantity !== null && (item.box_p_quantity > 0 || item.box_m_quantity > 0)) {
-    context.addIssue({ code: "custom", message: "Escolha caixas ou Pirex, não ambos." });
-  }
-  if (item.pirex_quantity === null && item.box_p_quantity === 0 && item.box_m_quantity === 0) {
-    context.addIssue({ code: "custom", message: "Indique pelo menos uma quantidade." });
+  const modes = [
+    item.box_p_quantity > 0 || item.box_m_quantity > 0,
+    item.pirex_quantity !== null,
+    item.unit_quantity !== null,
+    item.not_required,
+  ].filter(Boolean).length;
+  if (modes !== 1) {
+    context.addIssue({ code: "custom", message: "Escolha caixas, Pirex ou unidades." });
   }
 });
 

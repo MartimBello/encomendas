@@ -219,6 +219,8 @@ export interface WeeklyMenuOrderItem {
   box_p_quantity: number;
   box_m_quantity: number;
   pirex_quantity: number | null;
+  unit_quantity: number | null;
+  not_required: boolean;
   position: number;
 }
 
