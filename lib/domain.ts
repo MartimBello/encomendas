@@ -230,6 +230,7 @@ export interface WeeklyMenuOrder {
   source_updated_at: string;
   created_at: string;
   updated_at: string;
+  store?: Pick<Location, "id" | "name" | "address"> | null;
   items?: WeeklyMenuOrderItem[];
 }
 

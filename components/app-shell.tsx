@@ -25,6 +25,7 @@ const navigation: Record<AppRole, NavigationItem[]> = {
   ],
   kitchen: [
     { href: "/cozinha", label: "Fila da cozinha", icon: ChefHat },
+    { href: "/cozinha/ementa", label: "Ementa", icon: UtensilsCrossed },
     { href: "/cozinha/sazonais", label: "Sazonais", icon: Gift },
   ],
   admin: [

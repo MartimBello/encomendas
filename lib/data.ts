@@ -26,6 +26,25 @@ export async function getWeeklyMenuOrder(referenceDate: string) {
   return data as unknown as WeeklyMenuOrder | null;
 }
 
+export async function getWeeklyMenuOrdersForKitchen(referenceDate: string) {
+  const supabase = await createClient();
+  if (!supabase) return { orders: [] as WeeklyMenuOrder[], stores: [] as Location[] };
+  const [{ data: orders, error: ordersError }, { data: stores, error: storesError }] = await Promise.all([
+    supabase
+      .from("weekly_menu_orders")
+      .select("*, store:locations!weekly_menu_orders_store_id_fkey(id,name,address), items:weekly_menu_order_items(*)")
+      .eq("reference_date", referenceDate)
+      .order("position", { referencedTable: "weekly_menu_order_items" }),
+    supabase.from("locations").select("*").eq("kind", "store").eq("active", true).order("name"),
+  ]);
+  if (ordersError) throw ordersError;
+  if (storesError) throw storesError;
+  return {
+    orders: (orders ?? []) as unknown as WeeklyMenuOrder[],
+    stores: (stores ?? []) as Location[],
+  };
+}
+
 export async function getOrders(options?: { status?: string; search?: string; limit?: number; kind?: "regular" | "seasonal" }) {
   const supabase = await createClient();
   if (!supabase) return [] as Order[];
