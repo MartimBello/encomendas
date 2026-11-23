@@ -25,6 +25,40 @@ test("store account reaches the order list and cannot open admin", async ({ page
   await expect(page.getByRole("heading", { name: "Sem acesso a esta área" })).toBeVisible();
 });
 
+test("store saves and revises weekly menu quantities", async ({ page, browser }, testInfo) => {
+  await login(page, "loja@encomendas.local");
+  await page.goto("/loja/ementa");
+  await expect(page.getByRole("heading", { name: "Ementa semanal" })).toBeVisible();
+
+  const firstBoxP = page.getByLabel("Box P").first();
+  const boxQuantity = testInfo.project.name === "iPad" ? "2" : "3";
+  const saveMenuOrder = page.getByRole("button", { name: "Guardar encomenda" });
+  await expect(async () => {
+    await firstBoxP.fill("");
+    await firstBoxP.fill(boxQuantity);
+    await expect(saveMenuOrder).toBeEnabled({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+  await saveMenuOrder.click();
+  await expect(page.getByText("Quantidades guardadas.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Box P").first()).toHaveValue(boxQuantity);
+  const firstPirex = page.getByLabel("Pirex", { exact: true }).first();
+  await firstPirex.click();
+  await expect(page.getByLabel("Box P").first()).toBeDisabled();
+  await expect(page.getByLabel("Qtd. Pirex").first()).toHaveValue("1");
+
+  const kitchen = await browser.newPage();
+  await login(kitchen, "cozinha@encomendas.local");
+  await kitchen.goto("/cozinha/ementa");
+  await expect(kitchen.getByRole("heading", { name: "Ementa das lojas" })).toBeVisible();
+  const storeOrder = kitchen.getByRole("article", { name: "Encomenda de Loja da Boavista" });
+  await expect(storeOrder).toBeVisible();
+  await expect(storeOrder.getByText("Recebida")).toBeVisible();
+  await expect(storeOrder.getByRole("row").nth(1)).toContainText(boxQuantity);
+  await kitchen.close();
+});
+
 test("kitchen and admin accounts are routed to their workspaces", async ({ browser }) => {
   const kitchen = await browser.newPage();
   await login(kitchen, "cozinha@encomendas.local");

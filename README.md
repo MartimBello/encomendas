@@ -52,6 +52,7 @@ Estas credenciais existem apenas no seed local e nunca devem ser utilizadas em p
 - Fila Realtime, alarme repetido a cada 10 segundos, estado de ligação e PWA/Web Push.
 - Outbox transacional processada pela Edge Function `process-notifications`, com Resend, Web Push, idempotência e retry exponencial.
 - Impressão protegida em A4 ou 80 mm e anonimização diária após o prazo configurado (24 meses por defeito).
+- Ementa semanal carregada do sistema central, com quantidades por loja em caixas P/M ou Pirex.
 
 ## Comandos úteis
 
@@ -79,6 +80,7 @@ Nos workspaces locais do Conductor, `test:e2e` cria e remove automaticamente uma
 4. Configure o SMTP personalizado do Supabase Auth com as credenciais SMTP do domínio verificado no Resend, para convites e recuperação de palavra-passe.
 5. Crie um Database Webhook em inserts de `notification_outbox` para a Edge Function e um Supabase Cron a cada minuto como retry. O webhook deve usar a chave de serviço; o cron deve enviar `x-worker-secret` a partir do Vault.
 6. Defina `NEXT_PUBLIC_SITE_URL`, URLs autorizadas do Auth e as variáveis Supabase/VAPID/Resend no Vercel.
+   Configure também `CENTRAL_API_BASE_URL` se a API da ementa não estiver em `https://central.olguinhas.pt`.
 7. Crie o primeiro utilizador no Supabase Auth, atribua-lhe `role = admin` e `active = true` em `profiles`, e conclua a configuração pela área de Administração.
 8. Instale a PWA nos tablets. Em iPad, a instalação no ecrã principal é obrigatória para Web Push. Abra a Cozinha e toque em “Ativar agora”.
 

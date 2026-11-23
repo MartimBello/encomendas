@@ -208,6 +208,32 @@ export interface NotificationJob {
   created_at: string;
 }
 
+export interface WeeklyMenuOrderItem {
+  id: string;
+  order_id: string;
+  day_key: string;
+  day_label: string;
+  category_key: string;
+  category_label: string;
+  dish_name: string;
+  box_p_quantity: number;
+  box_m_quantity: number;
+  pirex_quantity: number | null;
+  position: number;
+}
+
+export interface WeeklyMenuOrder {
+  id: string;
+  store_id: string;
+  reference_date: string;
+  menu_title: string;
+  source_updated_at: string;
+  created_at: string;
+  updated_at: string;
+  store?: Pick<Location, "id" | "name" | "address"> | null;
+  items?: WeeklyMenuOrderItem[];
+}
+
 export const roleLabels: Record<AppRole, string> = {
   admin: "Administração",
   store: "Loja",
