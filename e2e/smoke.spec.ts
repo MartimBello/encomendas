@@ -130,19 +130,24 @@ test("seasonal campaigns expose their special menu and pickup ranges", async ({ 
   await expect(admin.getByLabel("Separar os totais por dia")).not.toBeChecked();
   await expect(admin.getByLabel("Separar por loja de levantamento ou entrega")).not.toBeChecked();
   await expect(admin.getByText("Sem seleção, são incluídos todos os artigos.")).toBeVisible();
-  await admin.goBack();
+  await admin.getByRole("link", { name: "Editar campanha" }).click();
+  await expect(admin).toHaveURL(/\/admin\/sazonais\/40000000-0000-4000-8000-000000000001$/);
   await expect(admin.getByRole("heading", { name: "Natal — demonstração local", exact: true })).toBeVisible();
 
   await admin.getByLabel("Nome do artigo").fill(productName);
   await admin.getByLabel("Unidade (quantidade normal)", { exact: true }).fill("un.");
-  await admin.getByLabel("Preço por unidade / peso (€)", { exact: true }).fill("12.34");
+  await admin.getByLabel("Opções / variações (uma por linha)", { exact: true }).fill("Pequeno\nGrande");
+  await admin.getByLabel("Pequeno", { exact: true }).fill("12.34");
+  await admin.getByLabel("Grande", { exact: true }).fill("15.67");
   await admin.getByRole("button", { name: "Adicionar artigo" }).click();
   await expect(admin.getByText("Artigo adicionado ao menu especial.")).toBeVisible();
   const productRow = admin.getByRole("row", { name: new RegExp(`Artigo ${productName}`) });
   await expect(productRow).toContainText("12,34");
+  await expect(productRow).toContainText("15,67");
   await productRow.getByRole("button", { name: "Editar" }).click();
   const productDialog = admin.getByRole("dialog", { name: `Editar artigo · ${productName}` });
-  await expect(productDialog.getByLabel("Preço por unidade / peso (€)")).toHaveValue("12.34");
+  await expect(productDialog.getByLabel("Pequeno", { exact: true })).toHaveValue("12.34");
+  await expect(productDialog.getByLabel("Grande", { exact: true })).toHaveValue("15.67");
   await productDialog.getByLabel("Nome").fill(editedProductName);
   await productDialog.getByLabel("Limite de stock").fill("100");
   await productDialog.getByRole("button", { name: "Guardar alterações" }).click();

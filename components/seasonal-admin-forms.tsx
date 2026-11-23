@@ -33,6 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShadcnDateTimePicker, ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
+import { ProductPriceFields } from "@/components/product-price-fields";
 
 const initial = { ok: false as const, message: "" };
 
@@ -46,6 +47,12 @@ function formData(values: Record<string, string | number | boolean | null | unde
     if (value === true) data.set(key, "on");
     else if (value !== false && value !== null && value !== undefined) data.set(key, String(value));
   }
+  return data;
+}
+
+function productFormData(values: Record<string, string | number | boolean | null | undefined>, variations: string[], prices: Record<string, number | null>) {
+  const data = formData(values);
+  for (const variation of variations) data.append("variation_price", prices[variation] === null || prices[variation] === undefined ? "" : String(prices[variation] / 100));
   return data;
 }
 
@@ -135,6 +142,7 @@ export function SeasonalCampaignEditForm({ campaign }: { campaign: SeasonalCampa
 
 export function SeasonalProductForm({ campaignId, categories }: { campaignId: string; categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createSeasonalProductAction, initial);
+  const [variations, setVariations] = useState("");
   return <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
     <input type="hidden" name="campaign_id" value={campaignId} />
     <div className="flex flex-col gap-2">
@@ -153,7 +161,6 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
       <Label htmlFor="season-product-unit">Unidade (quantidade normal)</Label>
       <Input id="season-product-unit" name="unit_label" defaultValue="un." placeholder="kg, dose…" required />
     </div>
-    <Field><FieldLabel htmlFor="season-product-unit-price">Preço por unidade / peso (€)</FieldLabel><Input id="season-product-unit-price" name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="Sem preço" /></Field>
     <div className="flex flex-col gap-2"><Label htmlFor="season-product-quantity-mode">Forma de escolha</Label><NativeSelect id="season-product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
     <div className="flex flex-col gap-2"><Label htmlFor="season-product-weight-unit">Unidade do peso individual</Label><Input id="season-product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></div>
     <div className="flex flex-col gap-2">
@@ -172,7 +179,7 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
       <Label htmlFor="season-product-stock">Limite de stock</Label>
       <Input id="season-product-stock" name="stock_limit" type="number" min="0.001" step="0.001" placeholder="Sem limite" />
     </div>
-    <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4"><Label htmlFor="season-product-variations">Opções / variações (uma por linha)</Label><Textarea id="season-product-variations" name="variations" placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></div>
+    <ProductPriceFields idPrefix="season-product" variations={variations} onVariationsChange={setVariations} className="sm:col-span-2 lg:col-span-4" />
     <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id="season-requires-note" name="requires_note" /><Label htmlFor="season-requires-note">Nota obrigatória</Label></div>
     <div className="sm:col-span-2 lg:col-span-4"><Message state={state} /><Button className="mt-2" disabled={pending || !categories.length}><Plus />Adicionar artigo</Button></div>
   </form>;
@@ -181,6 +188,7 @@ export function SeasonalProductForm({ campaignId, categories }: { campaignId: st
 export function SeasonalProductEditForm({ product, categories }: { product: SeasonalProduct; categories: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const [variations, setVariations] = useState(product.variations.join("\n"));
   const [pending, start] = useTransition();
   const fieldId = `season-product-edit-${product.id}`;
   const submit = (data: FormData) => start(async () => {
@@ -188,7 +196,7 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
     const result = await updateSeasonalProductAction(initial, data);
     if (!result.ok) { setError(result.message); return; }
     setOpen(false);
-    showUndoToast(result.message, () => updateSeasonalProductAction(initial, formData({
+    showUndoToast(result.message, () => updateSeasonalProductAction(initial, productFormData({
       product_id: product.id,
       category_id: product.category_id ?? "",
       name: product.name,
@@ -203,9 +211,9 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
       stock_limit: product.stock_limit ?? "",
       variations: product.variations.join("\n"),
       requires_note: product.requires_note,
-    })));
+    }, product.variations, product.variation_prices_cents)));
   });
-  return <Dialog open={open} onOpenChange={setOpen}>
+  return <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setVariations(product.variations.join("\n")); }}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
     <DialogContent className="max-w-3xl">
       <DialogHeader><DialogTitle>Editar artigo · {product.name}</DialogTitle><DialogDescription>Atualize a categoria, quantidades, stock e restantes dados do artigo.</DialogDescription></DialogHeader>
@@ -215,14 +223,13 @@ export function SeasonalProductEditForm({ product, categories }: { product: Seas
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-name`}>Nome</Label><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-description`}>Descrição</Label><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</Label><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></div>
-        <Field><FieldLabel htmlFor={`${fieldId}-unit-price`}>Preço por unidade / peso (€)</FieldLabel><Input id={`${fieldId}-unit-price`} name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" defaultValue={product.unit_price_cents === null ? "" : product.unit_price_cents / 100} placeholder="Sem preço" /></Field>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</Label><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</Label><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-minimum`}>Quantidade mínima</Label><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-step`}>Incremento</Label><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-position`}>Posição no menu</Label><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></div>
         <div className="flex flex-col gap-2"><Label htmlFor={`${fieldId}-stock`}>Limite de stock</Label><Input id={`${fieldId}-stock`} name="stock_limit" type="number" min="0.001" step="0.001" defaultValue={product.stock_limit ?? ""} placeholder="Sem limite" /></div>
-        <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3"><Label htmlFor={`${fieldId}-variations`}>Opções / variações (uma por linha)</Label><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></div>
+        <ProductPriceFields idPrefix={fieldId} variations={variations} onVariationsChange={setVariations} unitPriceCents={product.unit_price_cents} variationPricesCents={product.variation_prices_cents} className="sm:col-span-2 lg:col-span-3" />
         <div className="flex items-center gap-2 rounded-xl border px-3"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><Label htmlFor={`${fieldId}-requires-note`}>Nota obrigatória</Label></div>
         <div className="sm:col-span-2 lg:col-span-3"><Message state={{ ok: false, message: error }} /></div>
         <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}Guardar alterações</Button></DialogFooter>
