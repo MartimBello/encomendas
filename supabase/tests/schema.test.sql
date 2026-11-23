@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(24);
 
 select has_table('public', 'orders', 'orders table exists');
 select has_table('public', 'order_revisions', 'order revisions table exists');
@@ -8,6 +8,8 @@ select has_column('public', 'products', 'quantity_mode', 'catalog products defin
 select has_column('public', 'seasonal_products', 'quantity_mode', 'seasonal products define their quantity mode');
 select has_column('public', 'products', 'unit_price_cents', 'catalog products can define an estimated unit price');
 select has_column('public', 'seasonal_products', 'unit_price_cents', 'seasonal products can define an estimated unit price');
+select has_column('public', 'products', 'variation_prices_cents', 'catalog products can define a price for each variation');
+select has_column('public', 'seasonal_products', 'variation_prices_cents', 'seasonal products can define a price for each variation');
 select has_column('public', 'order_items', 'unit_weights', 'order lines snapshot individual unit weights');
 select has_column('public', 'order_items', 'unit_weight_label', 'order lines snapshot the weight unit');
 select has_column('public', 'order_items', 'unit_price_cents', 'order lines snapshot the unit price');

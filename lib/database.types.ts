@@ -249,14 +249,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"unit_label": string,"unit_price_cents": number | null,"unit_weight_label": string,"updated_at": string,"variations": (string)[]
+                    "active": boolean,"category_id": string,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"unit_label": string,"unit_price_cents": number | null,"unit_weight_label": string,"updated_at": string,"variation_prices_cents": NonNullable<Json>,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"category_id": string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variation_prices_cents"?: NonNullable<Json>,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"category_id"?: string,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variation_prices_cents"?: NonNullable<Json>,"variations"?: (string)[]
                   }
                   Relationships: [
                     {
@@ -343,14 +343,14 @@ isOneToOne: false
                   ]
                 },"seasonal_products": {
                   Row: {
-                    "active": boolean,"campaign_id": string,"category_id": string | null,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"unit_price_cents": number | null,"unit_weight_label": string,"updated_at": string,"variations": (string)[]
+                    "active": boolean,"campaign_id": string,"category_id": string | null,"created_at": string,"description": string,"id": string,"minimum_quantity": number,"name": string,"position": number,"quantity_mode": Database["public"]['Enums']["product_quantity_mode"],"quantity_step": number,"requires_note": boolean,"stock_limit": number | null,"unit_label": string,"unit_price_cents": number | null,"unit_weight_label": string,"updated_at": string,"variation_prices_cents": NonNullable<Json>,"variations": (string)[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"campaign_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"campaign_id": string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name": string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variation_prices_cents"?: NonNullable<Json>,"variations"?: (string)[]
                   }
                   Update: {
-                    "active"?: boolean,"campaign_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variations"?: (string)[]
+                    "active"?: boolean,"campaign_id"?: string,"category_id"?: string | null,"created_at"?: string,"description"?: string,"id"?: string,"minimum_quantity"?: number,"name"?: string,"position"?: number,"quantity_mode"?: Database["public"]['Enums']["product_quantity_mode"],"quantity_step"?: number,"requires_note"?: boolean,"stock_limit"?: number | null,"unit_label"?: string,"unit_price_cents"?: number | null,"unit_weight_label"?: string,"updated_at"?: string,"variation_prices_cents"?: NonNullable<Json>,"variations"?: (string)[]
                   }
                   Relationships: [
                     {

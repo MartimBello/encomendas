@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { ShadcnTimePicker } from "@/components/shadcn-date-time-picker";
+import { ProductPriceFields } from "@/components/product-price-fields";
 
 const initial = { ok: false as const, message: "" };
 function Message({ state }: { state: { ok: boolean; message?: string } }) { return state.message ? <p className={state.ok ? "rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" : "rounded-xl bg-red-50 p-3 text-sm text-red-800"}>{state.message}</p> : null; }
@@ -30,6 +30,12 @@ function formData(values: Record<string, string | number | boolean | null | unde
     if (value === true) data.set(key, "on");
     else if (value !== false && value !== null && value !== undefined) data.set(key, String(value));
   }
+  return data;
+}
+
+function productFormData(values: Record<string, string | number | boolean | null | undefined>, variations: string[], prices: Record<string, number | null>) {
+  const data = formData(values);
+  for (const variation of variations) data.append("variation_price", prices[variation] === null || prices[variation] === undefined ? "" : String(prices[variation] / 100));
   return data;
 }
 
@@ -208,19 +214,19 @@ export function CategoryTable({ categories }: { categories: Category[] }) {
 
 export function ProductForm({ categories }: { categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createProductAction, initial);
+  const [variations, setVariations] = useState("");
   return <form action={action}>
     <FieldGroup className="grid sm:grid-cols-2 lg:grid-cols-3">
       <Field><FieldLabel htmlFor="product-category">Categoria</FieldLabel><NativeSelect id="product-category" name="category_id" defaultValue={categories[0]?.id} required><NativeSelectOption value="" disabled>Escolher categoria</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{category.name}</NativeSelectOption>)}</NativeSelect></Field>
       <Field><FieldLabel htmlFor="product-name">Nome</FieldLabel><Input id="product-name" name="name" placeholder="Nome do artigo" required /></Field>
       <Field><FieldLabel htmlFor="product-description">Descrição</FieldLabel><Input id="product-description" name="description" placeholder="Descrição" /></Field>
       <Field><FieldLabel htmlFor="product-unit">Unidade (quantidade normal)</FieldLabel><Input id="product-unit" name="unit_label" defaultValue="un." placeholder="kg, tab., dose…" required /></Field>
-      <Field><FieldLabel htmlFor="product-unit-price">Preço por unidade / peso (€)</FieldLabel><Input id="product-unit-price" name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" placeholder="Sem preço" /></Field>
       <Field><FieldLabel htmlFor="product-quantity-mode">Forma de escolha</FieldLabel><NativeSelect id="product-quantity-mode" name="quantity_mode" defaultValue="standard"><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
       <Field><FieldLabel htmlFor="product-weight-unit">Unidade do peso individual</FieldLabel><Input id="product-weight-unit" name="unit_weight_label" defaultValue="kg" maxLength={20} required /></Field>
       <Field><FieldLabel htmlFor="product-minimum">Quantidade mínima</FieldLabel><Input id="product-minimum" name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
       <Field><FieldLabel htmlFor="product-step">Incremento</FieldLabel><Input id="product-step" name="quantity_step" type="number" min="0.001" step="0.001" defaultValue="1" required /></Field>
       <Field><FieldLabel htmlFor="product-position">Posição na categoria</FieldLabel><Input id="product-position" name="position" type="number" min="0" defaultValue="0" required /></Field>
-      <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor="product-variations">Opções / variações (uma por linha)</FieldLabel><Textarea id="product-variations" name="variations" placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></Field>
+      <ProductPriceFields idPrefix="product" variations={variations} onVariationsChange={setVariations} className="sm:col-span-2 lg:col-span-3" />
       <Field orientation="horizontal"><Switch id="requires-note" name="requires_note" /><FieldLabel htmlFor="requires-note">Observação obrigatória</FieldLabel></Field>
       <Field className="sm:col-span-2 lg:col-span-3"><Message state={state} /><Button className="w-fit" disabled={pending || !categories.length}>{pending && <LoaderCircle className="animate-spin" />}<Plus data-icon="inline-start" />Adicionar artigo</Button></Field>
     </FieldGroup>
@@ -230,6 +236,7 @@ export function ProductForm({ categories }: { categories: { id: string; name: st
 export function ProductEditForm({ product, categories }: { product: Product; categories: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const [variations, setVariations] = useState(product.variations.join("\n"));
   const [pending, start] = useTransition();
   const fieldId = `product-edit-${product.id}`;
   const submit = (data: FormData) => start(async () => {
@@ -237,7 +244,7 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
     const result = await updateProductAction(initial, data);
     if (!result.ok) { setError(result.message); return; }
     setOpen(false);
-    showUndoToast(result.message, () => updateProductAction(initial, formData({
+    showUndoToast(result.message, () => updateProductAction(initial, productFormData({
       product_id: product.id,
       category_id: product.category_id,
       name: product.name,
@@ -251,9 +258,9 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
       position: product.position,
       variations: product.variations.join("\n"),
       requires_note: product.requires_note,
-    })));
+    }, product.variations, product.variation_prices_cents)));
   });
-  return <Dialog open={open} onOpenChange={setOpen}>
+  return <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setVariations(product.variations.join("\n")); }}>
     <DialogTrigger asChild><Button size="sm" variant="outline"><Pencil data-icon="inline-start" />Editar</Button></DialogTrigger>
     <DialogContent className="max-w-3xl">
       <DialogHeader><DialogTitle>Editar artigo · {product.name}</DialogTitle><DialogDescription>Atualize todos os dados usados no catálogo e nos formulários de encomenda.</DialogDescription></DialogHeader>
@@ -264,13 +271,12 @@ export function ProductEditForm({ product, categories }: { product: Product; cat
           <Field><FieldLabel htmlFor={`${fieldId}-name`}>Nome</FieldLabel><Input id={`${fieldId}-name`} name="name" defaultValue={product.name} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-description`}>Descrição</FieldLabel><Input id={`${fieldId}-description`} name="description" defaultValue={product.description} /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-unit`}>Unidade (quantidade normal)</FieldLabel><Input id={`${fieldId}-unit`} name="unit_label" defaultValue={product.unit_label} required /></Field>
-          <Field><FieldLabel htmlFor={`${fieldId}-unit-price`}>Preço por unidade / peso (€)</FieldLabel><Input id={`${fieldId}-unit-price`} name="unit_price" type="number" inputMode="decimal" min="0" max="1000000" step="0.01" defaultValue={product.unit_price_cents === null ? "" : product.unit_price_cents / 100} placeholder="Sem preço" /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-quantity-mode`}>Forma de escolha</FieldLabel><NativeSelect id={`${fieldId}-quantity-mode`} name="quantity_mode" defaultValue={product.quantity_mode}><NativeSelectOption value="standard">Quantidade normal</NativeSelectOption><NativeSelectOption value="selection">Seleção (Pequeno/Grande)</NativeSelectOption><NativeSelectOption value="unit_weight">Unidades com peso individual</NativeSelectOption></NativeSelect></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-weight-unit`}>Unidade do peso individual</FieldLabel><Input id={`${fieldId}-weight-unit`} name="unit_weight_label" defaultValue={product.unit_weight_label} maxLength={20} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-minimum`}>Quantidade mínima</FieldLabel><Input id={`${fieldId}-minimum`} name="minimum_quantity" type="number" min="0.001" step="0.001" defaultValue={product.minimum_quantity} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-step`}>Incremento</FieldLabel><Input id={`${fieldId}-step`} name="quantity_step" type="number" min="0.001" step="0.001" defaultValue={product.quantity_step} required /></Field>
           <Field><FieldLabel htmlFor={`${fieldId}-position`}>Posição na categoria</FieldLabel><Input id={`${fieldId}-position`} name="position" type="number" min="0" defaultValue={product.position} required /></Field>
-          <Field className="sm:col-span-2 lg:col-span-3"><FieldLabel htmlFor={`${fieldId}-variations`}>Opções / variações (uma por linha)</FieldLabel><Textarea id={`${fieldId}-variations`} name="variations" defaultValue={product.variations.join("\n")} placeholder={"Pequeno\nGrande\n\nou\n\nCom recheio\nSem recheio"} /></Field>
+          <ProductPriceFields idPrefix={fieldId} variations={variations} onVariationsChange={setVariations} unitPriceCents={product.unit_price_cents} variationPricesCents={product.variation_prices_cents} className="sm:col-span-2 lg:col-span-3" />
           <Field orientation="horizontal"><Switch id={`${fieldId}-requires-note`} name="requires_note" defaultChecked={product.requires_note} /><FieldLabel htmlFor={`${fieldId}-requires-note`}>Observação obrigatória</FieldLabel></Field>
           {error && <FieldError className="sm:col-span-2 lg:col-span-3">{error}</FieldError>}
           <DialogFooter className="sm:col-span-2 lg:col-span-3"><DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose><Button disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}Guardar alterações</Button></DialogFooter>

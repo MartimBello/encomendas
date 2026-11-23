@@ -3,7 +3,9 @@ select plan(51);
 truncate table public.orders cascade;
 
 update public.products
-set variations = array['Com recheio', 'Sem recheio'], unit_price_cents = 1299
+set variations = array['Com recheio', 'Sem recheio'],
+    unit_price_cents = null,
+    variation_prices_cents = '{"Com recheio": 1299, "Sem recheio": 1599}'::jsonb
 where id = '30000000-0000-4000-8000-000000000001';
 
 update public.products
@@ -52,8 +54,8 @@ select is((select count(*)::integer from public.order_events where event_type = 
 select is((select count(*)::integer from public.notification_outbox where kind = 'new_order'), 1, 'new order push is queued');
 select is((select count(*)::integer from public.order_items), 2, 'different variations of the same product create separate order lines');
 select is((select string_agg(variation_name, ', ' order by variation_name) from public.order_items), 'Com recheio, Sem recheio', 'regular order lines snapshot their selected variations');
-select is((select min(unit_price_cents) from public.order_items), 1299, 'regular order lines snapshot the catalog price');
-select is((select sum(estimated_total_cents)::bigint from public.order_items), 2598::bigint, 'regular order lines snapshot their estimated revenue');
+select is((select min(unit_price_cents) from public.order_items), 1299, 'regular order lines snapshot their variation prices');
+select is((select sum(estimated_total_cents)::bigint from public.order_items), 2898::bigint, 'regular order lines use each selected variation price');
 
 select is(
   public.create_order(

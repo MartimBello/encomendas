@@ -14,12 +14,18 @@ export function formatCurrency(cents: number | string) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(cents) / 100);
 }
 
-export function estimateLineTotalCents(product: { unit_price_cents: number | null; quantity_mode: ProductQuantityMode }, quantity: number, unitWeights: number[] = []) {
-  if (product.unit_price_cents === null) return null;
+export function productPriceCents(product: { unit_price_cents: number | null; variation_prices_cents?: Record<string, number | null>; variations?: string[] }, variation?: string) {
+  if (variation && product.variations?.length) return product.variation_prices_cents?.[variation] ?? null;
+  return product.unit_price_cents;
+}
+
+export function estimateLineTotalCents(product: { unit_price_cents: number | null; variation_prices_cents?: Record<string, number | null>; variations?: string[]; quantity_mode: ProductQuantityMode }, quantity: number, unitWeights: number[] = [], variation?: string) {
+  const price = productPriceCents(product, variation);
+  if (price === null) return null;
   const priceQuantity = product.quantity_mode === "unit_weight"
     ? unitWeights.reduce((total, weight) => total + Number(weight), 0)
     : quantity;
-  return Math.round(product.unit_price_cents * priceQuantity);
+  return Math.round(price * priceQuantity);
 }
 
 export function orderRevenueEstimate(items: OrderItem[] | undefined) {

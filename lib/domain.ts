@@ -49,6 +49,7 @@ export interface Product {
   quantity_mode: ProductQuantityMode;
   unit_weight_label: string;
   unit_price_cents: number | null;
+  variation_prices_cents: Record<string, number | null>;
   variations: string[];
   requires_note: boolean;
   active: boolean;
@@ -106,6 +107,7 @@ export interface SeasonalProduct {
   quantity_mode: ProductQuantityMode;
   unit_weight_label: string;
   unit_price_cents: number | null;
+  variation_prices_cents: Record<string, number | null>;
   variations: string[];
   stock_limit: number | null;
   requires_note: boolean;
