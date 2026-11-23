@@ -52,7 +52,7 @@ Estas credenciais existem apenas no seed local e nunca devem ser utilizadas em p
 - Fila Realtime, alarme repetido a cada 10 segundos, estado de ligação e PWA/Web Push.
 - Outbox transacional processada pela Edge Function `process-notifications`, com Resend, Web Push, idempotência e retry exponencial.
 - Impressão protegida em A4 ou 80 mm e anonimização diária após o prazo configurado (24 meses por defeito).
-- Ementa semanal carregada do sistema central, com quantidades por loja em caixas P/M ou Pirex.
+- Ementa semanal carregada do sistema central, com quantidades por loja em caixas P/M, Pirex ou unidades e estado diário completo apenas quando todos os pratos têm uma decisão.
 
 ## Comandos úteis
 

@@ -14,13 +14,14 @@ import type { WeeklyMenuOrder } from "@/lib/domain";
 import type { WeeklyMenu } from "@/lib/weekly-menu-schema";
 
 type QuantityState = {
+  mode: "boxes" | "pirex" | "unit" | "not_required";
   boxP: number;
   boxM: number;
-  pirex: boolean;
   pirexQuantity: number;
+  unitQuantity: number;
 };
 
-const EMPTY_QUANTITY: QuantityState = { boxP: 0, boxM: 0, pirex: false, pirexQuantity: 1 };
+const EMPTY_QUANTITY: QuantityState = { mode: "boxes", boxP: 0, boxM: 0, pirexQuantity: 1, unitQuantity: 1 };
 
 function itemKey(dayKey: string, categoryKey: string, dishName: string) {
   return `${dayKey}\u001f${categoryKey}\u001f${dishName}`;
@@ -34,6 +35,14 @@ function dateForDay(referenceDate: string, offset: number) {
 
 function updatedLabel(value: string) {
   return new Intl.DateTimeFormat("pt-PT", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function hasDecision(quantity: QuantityState | undefined) {
+  if (!quantity) return false;
+  if (quantity.mode === "not_required") return true;
+  if (quantity.mode === "pirex") return quantity.pirexQuantity > 0;
+  if (quantity.mode === "unit") return quantity.unitQuantity > 0;
+  return quantity.boxP > 0 || quantity.boxM > 0;
 }
 
 function NumberField({ label, value, disabled, onChange }: { label: string; value: number; disabled?: boolean; onChange: (value: number) => void }) {
@@ -59,10 +68,11 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
   const initialQuantities = useMemo(() => Object.fromEntries((savedOrder?.items ?? []).map((item) => [
     itemKey(item.day_key, item.category_key, item.dish_name),
     {
+      mode: item.not_required ? "not_required" : item.unit_quantity !== null ? "unit" : item.pirex_quantity !== null ? "pirex" : "boxes",
       boxP: item.box_p_quantity,
       boxM: item.box_m_quantity,
-      pirex: item.pirex_quantity !== null,
       pirexQuantity: item.pirex_quantity ?? 1,
+      unitQuantity: item.unit_quantity ?? 1,
     } satisfies QuantityState,
   ])), [savedOrder]);
   const today = new Date().toISOString().slice(0, 10);
@@ -79,11 +89,16 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
   };
 
   const selected = menu.dias[selectedDay];
+  const totalDishes = menu.dias.reduce((total, day) => total + menu.categorias.reduce((dayTotal, category) => dayTotal + (day.pratos[category.key] ?? []).length, 0), 0);
   const summary = Object.values(quantities).reduce((total, item) => ({
-    dishes: total.dishes + ((item.pirex ? item.pirexQuantity > 0 : item.boxP > 0 || item.boxM > 0) ? 1 : 0),
-    boxes: total.boxes + (item.pirex ? 0 : item.boxP + item.boxM),
-    pirex: total.pirex + (item.pirex ? item.pirexQuantity : 0),
-  }), { dishes: 0, boxes: 0, pirex: 0 });
+    decisions: total.decisions + (hasDecision(item) ? 1 : 0),
+    boxes: total.boxes + (item.mode === "boxes" ? item.boxP + item.boxM : 0),
+    pirex: total.pirex + (item.mode === "pirex" ? item.pirexQuantity : 0),
+    units: total.units + (item.mode === "unit" ? item.unitQuantity : 0),
+  }), { decisions: 0, boxes: 0, pirex: 0, units: 0 });
+  const selectedDishCount = menu.categorias.reduce((total, category) => total + (selected.pratos[category.key] ?? []).length, 0);
+  const selectedDecisionCount = menu.categorias.reduce((total, category) => total + (selected.pratos[category.key] ?? []).filter((dishName) => hasDecision(quantities[itemKey(selected.dia, category.key, dishName)])).length, 0);
+  const selectedComplete = selectedDecisionCount === selectedDishCount;
 
   const save = () => startTransition(async () => {
     const items = [];
@@ -91,10 +106,14 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
       for (const category of menu.categorias) {
         for (const dishName of day.pratos[category.key] ?? []) {
           const quantity = quantities[itemKey(day.dia, category.key, dishName)] ?? EMPTY_QUANTITY;
-          if (quantity.pirex && quantity.pirexQuantity > 0) {
-            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: quantity.pirexQuantity });
-          } else if (!quantity.pirex && (quantity.boxP > 0 || quantity.boxM > 0)) {
-            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: quantity.boxP, box_m_quantity: quantity.boxM, pirex_quantity: null });
+          if (quantity.mode === "pirex" && quantity.pirexQuantity > 0) {
+            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: quantity.pirexQuantity, unit_quantity: null, not_required: false });
+          } else if (quantity.mode === "unit" && quantity.unitQuantity > 0) {
+            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: null, unit_quantity: quantity.unitQuantity, not_required: false });
+          } else if (quantity.mode === "not_required") {
+            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: 0, box_m_quantity: 0, pirex_quantity: null, unit_quantity: null, not_required: true });
+          } else if (quantity.mode === "boxes" && (quantity.boxP > 0 || quantity.boxM > 0)) {
+            items.push({ day_key: day.dia, category_key: category.key, dish_name: dishName, box_p_quantity: quantity.boxP, box_m_quantity: quantity.boxM, pirex_quantity: null, unit_quantity: null, not_required: false });
           }
         }
       }
@@ -117,9 +136,10 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
           <div><p className="font-semibold">{menu.ementa}</p><p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="size-3.5" />Ementa atualizada em {updatedLabel(menu.ultimaAtualizacao)}</p></div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{summary.dishes} pratos</Badge>
+          <Badge variant="secondary">{summary.decisions} de {totalDishes} pratos decididos</Badge>
           <Badge variant="outline">{summary.boxes} caixas</Badge>
           <Badge variant="outline">{summary.pirex} Pirex</Badge>
+          <Badge variant="outline">{summary.units} unidades</Badge>
         </div>
       </CardContent>
     </Card>
@@ -127,10 +147,9 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
     <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
       <div className="flex min-w-max gap-2" role="tablist" aria-label="Dias da ementa">
         {menu.dias.map((day, index) => {
-          const ordered = menu.categorias.some((category) => (day.pratos[category.key] ?? []).some((dishName) => {
-            const value = quantities[itemKey(day.dia, category.key, dishName)];
-            return value && (value.pirex ? value.pirexQuantity > 0 : value.boxP > 0 || value.boxM > 0);
-          }));
+          const dishCount = menu.categorias.reduce((total, category) => total + (day.pratos[category.key] ?? []).length, 0);
+          const decisionCount = menu.categorias.reduce((total, category) => total + (day.pratos[category.key] ?? []).filter((dishName) => hasDecision(quantities[itemKey(day.dia, category.key, dishName)])).length, 0);
+          const completed = decisionCount === dishCount;
           return <button
             key={day.dia}
             type="button"
@@ -141,14 +160,20 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
           >
             <span className="block text-sm font-semibold">{day.diaLabel.replace("-feira", "")}</span>
             <span className={cn("text-xs", selectedDay === index ? "text-primary-foreground/75" : "text-muted-foreground")}>{dateForDay(menu.dataReferencia, index)}</span>
-            {ordered && <span className={cn("absolute right-2 top-2 grid size-4 place-items-center rounded-full", selectedDay === index ? "bg-white text-primary" : "bg-primary text-white")}><Check className="size-3" /></span>}
+            {completed ? <span title="Dia concluído" className={cn("absolute right-2 top-2 grid size-4 place-items-center rounded-full", selectedDay === index ? "bg-white text-primary" : "bg-emerald-600 text-white")}><Check className="size-3" /></span> : decisionCount > 0 ? <span title={`${decisionCount} de ${dishCount} pratos decididos`} className={cn("absolute right-2 top-2 size-2.5 rounded-full", selectedDay === index ? "bg-amber-200" : "bg-amber-500")} /> : null}
           </button>;
         })}
       </div>
     </div>
 
     <div role="tabpanel" className="space-y-4">
-      <div className="flex items-end justify-between gap-4"><div><h2 className="text-xl font-semibold">{selected.diaLabel}</h2><p className="text-sm text-muted-foreground">{dateForDay(menu.dataReferencia, selectedDay)}</p></div><p className="hidden text-xs text-muted-foreground sm:block">Escolha caixas P e M ou ative Pirex</p></div>
+      <div className="flex items-end justify-between gap-4"><div><h2 className="text-xl font-semibold">{selected.diaLabel}</h2><p className="text-sm text-muted-foreground">{dateForDay(menu.dataReferencia, selectedDay)}</p></div><p className="hidden text-xs text-muted-foreground sm:block">Escolha caixas P/M, Pirex ou unidades</p></div>
+      <Card className={selectedComplete ? "border-emerald-300 bg-emerald-50/60" : "border-amber-300 bg-amber-50/60"}>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="font-semibold">{selectedComplete ? "Dia completo" : "Dia incompleto"}</p><p className="text-sm text-muted-foreground">Introduza uma quantidade ou marque “Não necessário” em todos os pratos.</p></div>
+          <Badge variant={selectedComplete ? "accepted" : "pending"}>{selectedDecisionCount} de {selectedDishCount} decididos</Badge>
+        </CardContent>
+      </Card>
       {menu.categorias.map((category) => {
         const dishes = selected.pratos[category.key] ?? [];
         if (!dishes.length) return null;
@@ -161,13 +186,22 @@ export function WeeklyMenuOrderForm({ menu, savedOrder }: { menu: WeeklyMenu; sa
               return <div key={dishName} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(180px,1fr)_auto] sm:items-center sm:px-5">
                 <p className="font-medium leading-snug">{dishName}</p>
                 <div className="flex flex-wrap items-end gap-2 sm:justify-end">
-                  <NumberField label="Box P" value={quantity.boxP} disabled={quantity.pirex} onChange={(boxP) => updateQuantity(key, { boxP })} />
-                  <NumberField label="Box M" value={quantity.boxM} disabled={quantity.pirex} onChange={(boxM) => updateQuantity(key, { boxM })} />
+                  <NumberField label="Box P" value={quantity.boxP} disabled={quantity.mode !== "boxes"} onChange={(boxP) => updateQuantity(key, { boxP })} />
+                  <NumberField label="Box M" value={quantity.boxM} disabled={quantity.mode !== "boxes"} onChange={(boxM) => updateQuantity(key, { boxM })} />
                   <label className="flex h-10 min-w-24 cursor-pointer items-center gap-2 rounded-xl border bg-background px-3 text-sm font-medium">
-                    <Checkbox checked={quantity.pirex} onCheckedChange={(checked) => updateQuantity(key, { pirex: checked === true, boxP: 0, boxM: 0, pirexQuantity: quantity.pirexQuantity || 1 })} />
+                    <Checkbox checked={quantity.mode === "pirex"} onCheckedChange={(checked) => updateQuantity(key, { mode: checked === true ? "pirex" : "boxes", boxP: 0, boxM: 0, pirexQuantity: quantity.pirexQuantity || 1 })} />
                     Pirex
                   </label>
-                  {quantity.pirex && <NumberField label="Qtd. Pirex" value={quantity.pirexQuantity} onChange={(pirexQuantity) => updateQuantity(key, { pirexQuantity })} />}
+                  <label className="flex h-10 min-w-28 cursor-pointer items-center gap-2 rounded-xl border bg-background px-3 text-sm font-medium">
+                    <Checkbox checked={quantity.mode === "unit"} onCheckedChange={(checked) => updateQuantity(key, { mode: checked === true ? "unit" : "boxes", boxP: 0, boxM: 0, unitQuantity: quantity.unitQuantity || 1 })} />
+                    À unidade
+                  </label>
+                  <label className="flex h-10 min-w-36 cursor-pointer items-center gap-2 rounded-xl border bg-background px-3 text-sm font-medium">
+                    <Checkbox checked={quantity.mode === "not_required"} onCheckedChange={(checked) => updateQuantity(key, { mode: checked === true ? "not_required" : "boxes", boxP: 0, boxM: 0 })} />
+                    Não necessário
+                  </label>
+                  {quantity.mode === "pirex" && <NumberField label="Qtd. Pirex" value={quantity.pirexQuantity} onChange={(pirexQuantity) => updateQuantity(key, { pirexQuantity })} />}
+                  {quantity.mode === "unit" && <NumberField label="Qtd. unidades" value={quantity.unitQuantity} onChange={(unitQuantity) => updateQuantity(key, { unitQuantity })} />}
                 </div>
               </div>;
             })}

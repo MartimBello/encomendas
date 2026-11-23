@@ -26,7 +26,11 @@ export function KitchenWeeklyMenu({ menu, orders, stores }: { menu: WeeklyMenu; 
   const [selectedDay, setSelectedDay] = useState(initialDay);
   const selected = menu.dias[selectedDay];
   const ordersByStore = new Map(orders.map((order) => [order.store_id, order]));
-  const received = stores.filter((store) => ordersByStore.has(store.id)).length;
+  const expectedDishCount = menu.categorias.reduce((total, category) => total + (selected.pratos[category.key] ?? []).length, 0);
+  const completed = stores.filter((store) => {
+    const decided = new Set((ordersByStore.get(store.id)?.items ?? []).filter((item) => item.day_key === selected.dia).map((item) => `${item.category_key}\u001f${item.dish_name}`));
+    return menu.categorias.every((category) => (selected.pratos[category.key] ?? []).every((dishName) => decided.has(`${category.key}\u001f${dishName}`)));
+  }).length;
 
   return <div className="space-y-5">
     <Card className="border-primary/25">
@@ -35,7 +39,7 @@ export function KitchenWeeklyMenu({ menu, orders, stores }: { menu: WeeklyMenu; 
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><UtensilsCrossed className="size-5" /></span>
           <div><p className="font-semibold">{menu.ementa}</p><p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="size-3.5" />Ementa atualizada em {updatedLabel(menu.ultimaAtualizacao)}</p></div>
         </div>
-        <Badge variant={received === stores.length && stores.length > 0 ? "accepted" : "pending"}>{received} de {stores.length} lojas recebidas</Badge>
+        <Badge variant={completed === stores.length && stores.length > 0 ? "accepted" : "pending"}>{completed} de {stores.length} lojas concluíram {selected.diaLabel.replace("-feira", "")}</Badge>
       </CardContent>
     </Card>
 
@@ -61,28 +65,35 @@ export function KitchenWeeklyMenu({ menu, orders, stores }: { menu: WeeklyMenu; 
       {stores.map((store) => {
         const order = ordersByStore.get(store.id);
         const dayItems = (order?.items ?? []).filter((item) => item.day_key === selected.dia);
+        const itemsByDish = new Map(dayItems.map((item) => [`${item.category_key}\u001f${item.dish_name}`, item]));
+        const decidedCount = menu.categorias.reduce((total, category) => total + (selected.pratos[category.key] ?? []).filter((dishName) => itemsByDish.has(`${category.key}\u001f${dishName}`)).length, 0);
+        const dayCompleted = decidedCount === expectedDishCount;
         return <Card key={store.id} role="article" aria-label={`Encomenda de ${store.name}`} className={!order ? "border-dashed" : ""}>
           <CardHeader className="border-b bg-muted/30">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><Store className="size-5" /></span><div><CardTitle>{store.name}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{store.address}</p></div></div>
-              <Badge variant={order ? "accepted" : "pending"}>{order ? <><Check className="mr-1 size-3" />Recebida</> : "Por receber"}</Badge>
+              <Badge variant={dayCompleted ? "accepted" : "pending"}>{dayCompleted ? <><Check className="mr-1 size-3" />Concluído</> : decidedCount > 0 ? "Incompleto" : "Por receber"}</Badge>
             </div>
-            {order && <p className="pt-2 text-xs text-muted-foreground">Última alteração: {updatedLabel(order.updated_at)}</p>}
+            <p className="pt-2 text-xs text-muted-foreground">{decidedCount} de {expectedDishCount} produtos decididos{order ? ` · última alteração: ${updatedLabel(order.updated_at)}` : ""}</p>
           </CardHeader>
           <CardContent className="p-0">
-            {!order ? <p className="p-5 text-sm text-muted-foreground">Esta loja ainda não guardou a encomenda desta semana.</p> : !dayItems.length ? <p className="p-5 text-sm text-muted-foreground">Sem quantidades para este dia.</p> : <div className="divide-y">
+            {!dayCompleted && <p className="border-b bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900">Faltam decisões para {expectedDishCount - decidedCount} produto{expectedDishCount - decidedCount === 1 ? "" : "s"}.</p>}
+            <div className="divide-y">
               {menu.categorias.map((category) => {
-                const categoryItems = dayItems.filter((item) => item.category_key === category.key);
-                if (!categoryItems.length) return null;
+                const dishNames = selected.pratos[category.key] ?? [];
+                if (!dishNames.length) return null;
                 return <section key={category.key} className="py-3">
                   <h3 className="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{category.label}</h3>
                   <Table>
-                    <TableHeader><TableRow><TableHead>Prato</TableHead><TableHead className="w-20 text-center">P</TableHead><TableHead className="w-20 text-center">M</TableHead><TableHead className="w-24 text-center">Pirex</TableHead></TableRow></TableHeader>
-                    <TableBody>{categoryItems.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.dish_name}</TableCell><TableCell className="text-center tabular-nums">{item.box_p_quantity || "—"}</TableCell><TableCell className="text-center tabular-nums">{item.box_m_quantity || "—"}</TableCell><TableCell className="text-center tabular-nums">{item.pirex_quantity ?? "—"}</TableCell></TableRow>)}</TableBody>
+                    <TableHeader><TableRow><TableHead>Prato</TableHead><TableHead className="w-16 text-center">P</TableHead><TableHead className="w-16 text-center">M</TableHead><TableHead className="w-20 text-center">Pirex</TableHead><TableHead className="w-20 text-center">Unid.</TableHead></TableRow></TableHeader>
+                    <TableBody>{dishNames.map((dishName) => {
+                      const item = itemsByDish.get(`${category.key}\u001f${dishName}`);
+                      return <TableRow key={dishName}><TableCell className="font-medium"><span>{dishName}</span>{!item ? <Badge variant="pending" className="ml-2">Por decidir</Badge> : item.not_required ? <Badge variant="outline" className="ml-2">Não necessário</Badge> : null}</TableCell><TableCell className="text-center tabular-nums">{item?.box_p_quantity || "—"}</TableCell><TableCell className="text-center tabular-nums">{item?.box_m_quantity || "—"}</TableCell><TableCell className="text-center tabular-nums">{item?.pirex_quantity ?? "—"}</TableCell><TableCell className="text-center tabular-nums">{item?.unit_quantity ?? "—"}</TableCell></TableRow>;
+                    })}</TableBody>
                   </Table>
                 </section>;
               })}
-            </div>}
+            </div>
           </CardContent>
         </Card>;
       })}

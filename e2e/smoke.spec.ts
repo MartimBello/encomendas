@@ -31,9 +31,18 @@ test("store saves and revises weekly menu quantities", async ({ page, browser },
   await expect(page.getByRole("heading", { name: "Ementa semanal" })).toBeVisible();
 
   const firstBoxP = page.getByLabel("Box P").first();
+  const firstPirex = page.getByLabel("Pirex", { exact: true }).first();
+  const firstUnit = page.getByLabel("À unidade", { exact: true }).first();
+  const notRequired = page.getByLabel("Não necessário", { exact: true });
   const boxQuantity = testInfo.project.name === "iPad" ? "2" : "3";
   const saveMenuOrder = page.getByRole("button", { name: "Guardar encomenda" });
   await expect(async () => {
+    if (await firstPirex.isChecked()) await firstPirex.click();
+    if (await firstUnit.isChecked()) await firstUnit.click();
+    for (let index = 0; index < await notRequired.count(); index += 1) {
+      if (await notRequired.nth(index).isChecked()) await notRequired.nth(index).click();
+    }
+    await expect(firstBoxP).toBeEnabled({ timeout: 1_000 });
     await firstBoxP.fill("");
     await firstBoxP.fill(boxQuantity);
     await expect(saveMenuOrder).toBeEnabled({ timeout: 1_000 });
@@ -43,10 +52,21 @@ test("store saves and revises weekly menu quantities", async ({ page, browser },
 
   await page.reload();
   await expect(page.getByLabel("Box P").first()).toHaveValue(boxQuantity);
-  const firstPirex = page.getByLabel("Pirex", { exact: true }).first();
-  await firstPirex.click();
+  await page.getByLabel("Pirex", { exact: true }).first().click();
   await expect(page.getByLabel("Box P").first()).toBeDisabled();
   await expect(page.getByLabel("Qtd. Pirex").first()).toHaveValue("1");
+  await page.getByLabel("À unidade", { exact: true }).first().click();
+  await expect(page.getByLabel("Pirex", { exact: true }).first()).not.toBeChecked();
+  await expect(page.getByLabel("À unidade", { exact: true }).first()).toBeChecked();
+  await expect(page.getByLabel("Qtd. Pirex")).toHaveCount(0);
+  await expect(page.getByLabel("Qtd. unidades").first()).toHaveValue("1");
+  await page.getByLabel("Não necessário", { exact: true }).first().click();
+  await expect(page.getByLabel("À unidade", { exact: true }).first()).not.toBeChecked();
+  await expect(page.getByLabel("Qtd. unidades")).toHaveCount(0);
+  await page.getByLabel("À unidade", { exact: true }).first().click();
+  await expect(page.getByLabel("Não necessário", { exact: true }).first()).not.toBeChecked();
+  await page.getByRole("button", { name: "Guardar encomenda" }).click();
+  await expect(page.getByText("Quantidades guardadas.")).toBeVisible();
 
   const kitchen = await browser.newPage();
   await login(kitchen, "cozinha@encomendas.local");
@@ -54,8 +74,21 @@ test("store saves and revises weekly menu quantities", async ({ page, browser },
   await expect(kitchen.getByRole("heading", { name: "Ementa das lojas" })).toBeVisible();
   const storeOrder = kitchen.getByRole("article", { name: "Encomenda de Loja da Boavista" });
   await expect(storeOrder).toBeVisible();
-  await expect(storeOrder.getByText("Recebida")).toBeVisible();
-  await expect(storeOrder.getByRole("row").nth(1)).toContainText(boxQuantity);
+  await expect(storeOrder.getByText("Incompleto")).toBeVisible();
+  await expect(storeOrder.getByText("Por decidir").first()).toBeVisible();
+  await expect(storeOrder.getByRole("row").nth(1).getByRole("cell").last()).toHaveText("1");
+
+  const remainingProducts = page.getByLabel("Não necessário", { exact: true });
+  for (let index = 1; index < await remainingProducts.count(); index += 1) await remainingProducts.nth(index).click();
+  await expect(page.getByText("Dia completo")).toBeVisible();
+  await page.getByRole("button", { name: "Guardar encomenda" }).click();
+  await expect(page.getByText("Alterações por guardar")).toHaveCount(0);
+
+  await kitchen.reload();
+  const completedStoreOrder = kitchen.getByRole("article", { name: "Encomenda de Loja da Boavista" });
+  await expect(completedStoreOrder.getByText("Concluído")).toBeVisible();
+  await expect(completedStoreOrder.getByText("Por decidir")).toHaveCount(0);
+  await expect(completedStoreOrder.getByText("Não necessário").first()).toBeVisible();
   await kitchen.close();
 });
 
