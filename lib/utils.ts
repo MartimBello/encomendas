@@ -14,12 +14,33 @@ export function formatCurrency(cents: number | string) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(cents) / 100);
 }
 
-export function estimateLineTotalCents(product: { unit_price_cents: number | null; quantity_mode: ProductQuantityMode }, quantity: number, unitWeights: number[] = []) {
-  if (product.unit_price_cents === null) return null;
+export function getProductUnitPriceCents(
+  product: { unit_price_cents: number | null; variation_prices?: Record<string, number> },
+  variation = "",
+) {
+  const variationPrice = variation ? product.variation_prices?.[variation] : undefined;
+  return variationPrice ?? product.unit_price_cents;
+}
+
+export function estimateLineTotalCents(
+  product: { unit_price_cents: number | null; variation_prices?: Record<string, number>; quantity_mode: ProductQuantityMode },
+  quantity: number,
+  unitWeights: number[] = [],
+  variation = "",
+) {
+  const unitPrice = getProductUnitPriceCents(product, variation);
+  if (unitPrice === null) return null;
   const priceQuantity = product.quantity_mode === "unit_weight"
     ? unitWeights.reduce((total, weight) => total + Number(weight), 0)
     : quantity;
-  return Math.round(product.unit_price_cents * priceQuantity);
+  return Math.round(unitPrice * priceQuantity);
+}
+
+export function formatVariationPricing(product: { variations: string[]; variation_prices?: Record<string, number> }) {
+  return product.variations.map((variation) => {
+    const price = product.variation_prices?.[variation];
+    return price === undefined ? variation : `${variation} = ${(price / 100).toFixed(2).replace(".", ",")}`;
+  }).join("\n");
 }
 
 export function orderRevenueEstimate(items: OrderItem[] | undefined) {

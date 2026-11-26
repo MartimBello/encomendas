@@ -1,7 +1,47 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Location, NotificationJob, Order, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product, SeasonalCampaign, WeeklyMenuOrder } from "@/lib/domain";
+import type { Location, NotificationJob, Order, OrderItem, OrderRevision, OrderStatus, OrderingSettings, PickupWindow, Product, ProductQuantityMode, SeasonalCampaign, WeeklyMenuOrder } from "@/lib/domain";
+import { estimateLineTotalCents, getProductUnitPriceCents } from "@/lib/utils";
+
+type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createClient>>>;
+type CatalogPrice = {
+  id: string;
+  quantity_mode: ProductQuantityMode;
+  unit_price_cents: number | null;
+  variation_prices: Record<string, number>;
+};
+
+async function calculateOrderItemPrices(supabase: SupabaseClient, items: OrderItem[]) {
+  if (!items.length) return;
+
+  const productIds = [...new Set(items.flatMap((item) => item.product_id ? [item.product_id] : []))];
+  const seasonalProductIds = [...new Set(items.flatMap((item) => item.seasonal_product_id ? [item.seasonal_product_id] : []))];
+  const [productsResult, seasonalProductsResult] = await Promise.all([
+    productIds.length
+      ? supabase.from("products").select("id,quantity_mode,unit_price_cents,variation_prices").in("id", productIds)
+      : Promise.resolve({ data: [], error: null }),
+    seasonalProductIds.length
+      ? supabase.from("seasonal_products").select("id,quantity_mode,unit_price_cents,variation_prices").in("id", seasonalProductIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (productsResult.error) throw productsResult.error;
+  if (seasonalProductsResult.error) throw seasonalProductsResult.error;
+
+  const productPrices = new Map((productsResult.data ?? []).map((product) => [product.id, product as unknown as CatalogPrice]));
+  const seasonalProductPrices = new Map((seasonalProductsResult.data ?? []).map((product) => [product.id, product as unknown as CatalogPrice]));
+
+  for (const item of items) {
+    item.unit_price_cents = null;
+    item.estimated_total_cents = null;
+    const product = item.product_id
+      ? productPrices.get(item.product_id)
+      : seasonalProductPrices.get(item.seasonal_product_id ?? "");
+    if (!product) continue;
+    item.unit_price_cents = getProductUnitPriceCents(product, item.variation_name);
+    item.estimated_total_cents = estimateLineTotalCents(product, Number(item.quantity), item.unit_weights ?? [], item.variation_name);
+  }
+}
 
 const orderListSelect = `
   id, order_number, campaign_id, ordering_store_id, pickup_store_id, status, current_version,
@@ -66,7 +106,9 @@ export async function getOrders(options?: { status?: string; search?: string; li
   const orders = (data ?? []) as unknown as Order[];
   const revisionIds = orders.map((order) => order.revision?.id).filter((id): id is string => Boolean(id));
   if (revisionIds.length) {
-    const { data: items } = await supabase.from("order_items").select("*").in("revision_id", revisionIds).order("position");
+    const { data: items, error: itemsError } = await supabase.from("order_items").select("*").in("revision_id", revisionIds).order("position");
+    if (itemsError) throw itemsError;
+    await calculateOrderItemPrices(supabase, (items ?? []) as OrderItem[]);
     for (const order of orders) if (order.revision) order.revision.items = (items ?? []).filter((item) => item.revision_id === order.revision?.id);
   }
   return orders;
@@ -96,6 +138,7 @@ export async function getSeasonalExportOrders(campaignId: string) {
     const ids = revisionIds.slice(index, index + 40);
     const { data: items, error } = await supabase.from("order_items").select("*").in("revision_id", ids).order("position");
     if (error) throw error;
+    await calculateOrderItemPrices(supabase, (items ?? []) as OrderItem[]);
     for (const order of orders) {
       if (order.revision && ids.includes(order.revision.id)) {
         order.revision.items = (items ?? []).filter((item) => item.revision_id === order.revision?.id);
@@ -132,14 +175,18 @@ export async function getOrder(orderId: string) {
   if (!order) return null;
   const typed = order as unknown as Order;
   if (typed.revision) {
-    const { data: items } = await supabase.from("order_items").select("*").eq("revision_id", typed.revision.id).order("position");
+    const { data: items, error: itemsError } = await supabase.from("order_items").select("*").eq("revision_id", typed.revision.id).order("position");
+    if (itemsError) throw itemsError;
+    await calculateOrderItemPrices(supabase, (items ?? []) as OrderItem[]);
     typed.revision.items = items ?? [];
   }
   const { data: revisions } = await supabase.from("order_revisions").select("*").eq("order_id", orderId).order("version", { ascending: false });
   const typedRevisions = (revisions ?? []) as OrderRevision[];
   const revisionIds = typedRevisions.map((revision) => revision.id);
   if (revisionIds.length) {
-    const { data: items } = await supabase.from("order_items").select("*").in("revision_id", revisionIds).order("position");
+    const { data: items, error: itemsError } = await supabase.from("order_items").select("*").in("revision_id", revisionIds).order("position");
+    if (itemsError) throw itemsError;
+    await calculateOrderItemPrices(supabase, (items ?? []) as OrderItem[]);
     for (const revision of typedRevisions) revision.items = (items ?? []).filter((item) => item.revision_id === revision.id);
   }
   return { order: typed, revisions: typedRevisions };
