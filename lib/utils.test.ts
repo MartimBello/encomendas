@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OrderItem } from "@/lib/domain";
-import { estimateLineTotalCents, orderRevenueEstimate } from "@/lib/utils";
+import { estimateLineTotalCents, getProductUnitPriceCents, orderRevenueEstimate } from "@/lib/utils";
 
 describe("revenue estimates", () => {
   it("uses quantity for standard and selection products", () => {
@@ -10,6 +10,13 @@ describe("revenue estimates", () => {
 
   it("uses the sum of individual weights for weighed products", () => {
     expect(estimateLineTotalCents({ unit_price_cents: 2500, quantity_mode: "unit_weight" }, 2, [2.2, 2.8])).toBe(12500);
+  });
+
+  it("uses a variation price before the product base price", () => {
+    const product = { unit_price_cents: 450, variation_prices: { Grande: 650 }, quantity_mode: "selection" as const };
+    expect(getProductUnitPriceCents(product, "Grande")).toBe(650);
+    expect(getProductUnitPriceCents(product, "Pequeno")).toBe(450);
+    expect(estimateLineTotalCents(product, 2, [], "Grande")).toBe(1300);
   });
 
   it("keeps missing prices distinguishable and marks mixed orders as partial", () => {

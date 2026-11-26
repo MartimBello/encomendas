@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(24);
 
 select has_table('public', 'orders', 'orders table exists');
 select has_table('public', 'order_revisions', 'order revisions table exists');
@@ -8,10 +8,12 @@ select has_column('public', 'products', 'quantity_mode', 'catalog products defin
 select has_column('public', 'seasonal_products', 'quantity_mode', 'seasonal products define their quantity mode');
 select has_column('public', 'products', 'unit_price_cents', 'catalog products can define an estimated unit price');
 select has_column('public', 'seasonal_products', 'unit_price_cents', 'seasonal products can define an estimated unit price');
+select has_column('public', 'products', 'variation_prices', 'catalog product variations can define their own prices');
+select has_column('public', 'seasonal_products', 'variation_prices', 'seasonal product variations can define their own prices');
 select has_column('public', 'order_items', 'unit_weights', 'order lines snapshot individual unit weights');
 select has_column('public', 'order_items', 'unit_weight_label', 'order lines snapshot the weight unit');
-select has_column('public', 'order_items', 'unit_price_cents', 'order lines snapshot the unit price');
-select has_column('public', 'order_items', 'estimated_total_cents', 'order lines snapshot their estimated revenue');
+select hasnt_column('public', 'order_items', 'unit_price_cents', 'order lines do not snapshot product prices');
+select hasnt_column('public', 'order_items', 'estimated_total_cents', 'order lines do not store calculated totals');
 select has_column('public', 'order_revisions', 'fulfillment_type', 'order revisions snapshot the fulfillment type');
 select has_column('public', 'order_revisions', 'delivery_address', 'order revisions snapshot the delivery address');
 select col_is_null('public', 'orders', 'pickup_store_id', 'delivery orders do not require a pickup store');

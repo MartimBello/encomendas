@@ -10,8 +10,27 @@ import { databaseError, settingsSchema, type ActionResult } from "@/lib/validati
 import { inputLocalToUtc } from "@/lib/dates";
 
 function parseVariations(value: FormDataEntryValue | null) {
-  const variations = [...new Set(String(value ?? "").split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean))];
-  return z.array(z.string().min(1).max(120)).max(20).safeParse(variations);
+  const variations: string[] = [];
+  const variationPrices: Record<string, number> = {};
+
+  for (const rawEntry of String(value ?? "").split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean)) {
+    const separator = rawEntry.indexOf("=");
+    const variation = (separator === -1 ? rawEntry : rawEntry.slice(0, separator)).trim();
+    if (!variation || variations.includes(variation)) return { success: false as const };
+    variations.push(variation);
+
+    if (separator !== -1) {
+      const rawPrice = rawEntry.slice(separator + 1).trim().replace(",", ".");
+      if (!/^\d+(?:\.\d{1,2})?$/.test(rawPrice)) return { success: false as const };
+      const price = Number(rawPrice);
+      if (!Number.isFinite(price) || price > 1_000_000) return { success: false as const };
+      variationPrices[variation] = Math.round(price * 100);
+    }
+  }
+
+  const parsed = z.array(z.string().min(1).max(120)).max(20).safeParse(variations);
+  if (!parsed.success) return { success: false as const };
+  return { success: true as const, data: { variations: parsed.data, variationPrices } };
 }
 
 const productQuantityFields = {
@@ -167,19 +186,19 @@ export async function createProductAction(_previous: ActionResult, formData: For
   await requireProfile(["admin"]);
   const parsed = z.object({ category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), unit_price: productUnitPrice, minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean(), ...productQuantityFields }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
-  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo. A seleção precisa de opções e as unidades com peso precisam de quantidades inteiras." };
+  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data.variations, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo. Use uma opção por linha e, se necessário, indique o preço como “Pequeno = 4,50”." };
   const { unit_price: unit_price_cents, ...product } = parsed.data;
-  const supabase = await createClient(); const { error } = await supabase!.from("products").insert({ ...product, unit_price_cents, variations: variations.data }); if (error) return { ok: false, message: databaseError(error) }; revalidateProductRoutes(); return { ok: true, message: "Artigo criado." };
+  const supabase = await createClient(); const { error } = await supabase!.from("products").insert({ ...product, unit_price_cents, variations: variations.data.variations, variation_prices: variations.data.variationPrices }); if (error) return { ok: false, message: databaseError(error) }; revalidateProductRoutes(); return { ok: true, message: "Artigo criado." };
 }
 
 export async function updateProductAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   await requireProfile(["admin"]);
   const parsed = z.object({ product_id: z.uuid(), category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), unit_price: productUnitPrice, minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), requires_note: z.boolean(), ...productQuantityFields }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
-  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo. A seleção precisa de opções e as unidades com peso precisam de quantidades inteiras." };
+  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data.variations, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo. Use uma opção por linha e, se necessário, indique o preço como “Pequeno = 4,50”." };
   const { product_id: productId, unit_price: unit_price_cents, ...updates } = parsed.data;
   const supabase = await createClient();
-  const { data, error } = await supabase!.from("products").update({ ...updates, unit_price_cents, variations: variations.data }).eq("id", productId).select("id").maybeSingle();
+  const { data, error } = await supabase!.from("products").update({ ...updates, unit_price_cents, variations: variations.data.variations, variation_prices: variations.data.variationPrices }).eq("id", productId).select("id").maybeSingle();
   if (error || !data) return { ok: false, message: databaseError(error, "O artigo não existe ou não pôde ser atualizado.") };
   revalidateProductRoutes();
   return { ok: true, message: "Artigo atualizado." };
@@ -263,9 +282,9 @@ export async function createSeasonalProductAction(_previous: ActionResult, formD
   await requireProfile(["admin"]);
   const parsed = z.object({ campaign_id: z.uuid(), category_id: z.uuid(), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), unit_price: productUnitPrice, minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()), requires_note: z.boolean(), ...productQuantityFields }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
-  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo sazonal. A seleção precisa de opções e as unidades com peso precisam de quantidades inteiras." };
+  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data.variations, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo sazonal. Use uma opção por linha e, se necessário, indique o preço como “Pequeno = 4,50”." };
   const { unit_price: unit_price_cents, ...product } = parsed.data;
-  const supabase = await createClient(); const { error } = await supabase!.from("seasonal_products").insert({ ...product, unit_price_cents, variations: variations.data });
+  const supabase = await createClient(); const { error } = await supabase!.from("seasonal_products").insert({ ...product, unit_price_cents, variations: variations.data.variations, variation_prices: variations.data.variationPrices });
   if (error) return { ok: false, message: databaseError(error) };
   revalidateSeasonalRoutes(parsed.data.campaign_id); return { ok: true, message: "Artigo adicionado ao menu especial." };
 }
@@ -274,9 +293,9 @@ export async function updateSeasonalProductAction(_previous: ActionResult, formD
   await requireProfile(["admin"]);
   const parsed = z.object({ product_id: z.uuid(), category_id: z.preprocess((value) => value === "" ? null : value, z.uuid().nullable()), name: z.string().trim().min(2).max(160), description: z.string().trim().max(1000), unit_label: z.string().trim().min(1).max(20), unit_price: productUnitPrice, minimum_quantity: z.coerce.number().positive(), quantity_step: z.coerce.number().positive(), position: z.coerce.number().int().min(0), stock_limit: z.preprocess((value) => value === "" ? null : value, z.coerce.number().positive().nullable()), requires_note: z.boolean(), ...productQuantityFields }).safeParse({ ...Object.fromEntries(formData), requires_note: formData.get("requires_note") === "on" });
   const variations = parseVariations(formData.get("variations"));
-  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo sazonal. A seleção precisa de opções e as unidades com peso precisam de quantidades inteiras." };
+  if (!parsed.success || !variations.success || !validQuantityConfiguration(parsed.data.quantity_mode, variations.data.variations, parsed.data.minimum_quantity, parsed.data.quantity_step)) return { ok: false, message: "Verifique os dados do artigo sazonal. Use uma opção por linha e, se necessário, indique o preço como “Pequeno = 4,50”." };
   const { product_id: productId, unit_price: unit_price_cents, ...updates } = parsed.data;
-  const supabase = await createClient(); const { data, error } = await supabase!.from("seasonal_products").update({ ...updates, unit_price_cents, variations: variations.data }).eq("id", productId).select("campaign_id").maybeSingle();
+  const supabase = await createClient(); const { data, error } = await supabase!.from("seasonal_products").update({ ...updates, unit_price_cents, variations: variations.data.variations, variation_prices: variations.data.variationPrices }).eq("id", productId).select("campaign_id").maybeSingle();
   if (error || !data) return { ok: false, message: databaseError(error, "O artigo não existe ou não pôde ser atualizado.") };
   revalidateSeasonalRoutes(data.campaign_id);
   return { ok: true, message: "Artigo atualizado." };
